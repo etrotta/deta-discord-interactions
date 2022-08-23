@@ -1,14 +1,9 @@
+import os
 import time
-import inspect
-from typing import Callable, Dict, List
-import uuid
-import atexit
-import asyncio
-import warnings
+from typing import Callable, Dict, List, NoReturn
+import json
 
 import requests
-
-from flask import Flask, Response, current_app, request, jsonify, abort
 
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
@@ -16,15 +11,18 @@ from nacl.signing import VerifyKey
 from flask_discord_interactions.models.autocomplete import AutocompleteResult
 from flask_discord_interactions.models.option import Option
 
-try:
-    import aiohttp
-except ImportError:
-    aiohttp = None
-
 from flask_discord_interactions.command import Command, SlashCommandGroup
 from flask_discord_interactions.context import Context, ApplicationCommandType
 from flask_discord_interactions.models import Message, Modal, ResponseType, Permission
-from flask_discord_interactions.utils import static_or_instance
+
+
+class AbortError(Exception):
+    def __init__(self, http_code: int):
+        self.http_code = http_code
+
+class PongResponse:
+    def encode(self):
+        return json.dumps({"type": ResponseType.PONG}), "application/json"
 
 
 class InteractionType:
@@ -172,7 +170,6 @@ class DiscordInteractionsBlueprint:
         name: str,
         description: str = "No description",
         *,
-        is_async: bool = False,
         default_member_permissions: int = None,
         dm_permission: bool = None,
         name_localizations: Dict[str, str] = None,
@@ -192,13 +189,10 @@ class DiscordInteractionsBlueprint:
             The description of the command group.
         description_localizations: Dict[str, str]
             A dictionary of localizations for the description of the command group.
-        is_async: bool
-            Whether the subgroup should be considered async (if subcommands
-            get an :class:`.AsyncContext` instead of a :class:`Context`.)
         default_member_permissions: int
             A permission integer defining the required permissions a user must have to run the command
         dm_permission: bool
-            Indicates whether the command canbe used in DMs
+            Indicates whether the command can be used in DMs
 
         Returns
         -------
@@ -209,7 +203,6 @@ class DiscordInteractionsBlueprint:
         group = SlashCommandGroup(
             name=name,
             description=description,
-            is_async=is_async,
             default_member_permissions=default_member_permissions,
             dm_permission=dm_permission,
             name_localizations=name_localizations,
@@ -218,7 +211,7 @@ class DiscordInteractionsBlueprint:
         self.discord_commands[name] = group
         return group
 
-    def add_custom_handler(self, handler: Callable, custom_id: str = None):
+    def add_custom_handler(self, handler: Callable, custom_id: str):
         """
         Add a handler for an incoming interaction with the specified custom ID.
 
@@ -227,29 +220,24 @@ class DiscordInteractionsBlueprint:
         handler: Callable
             The function to call to handle the incoming interaction.
         custom_id: str
-            The custom ID to respond to. If not specified, the ID will be
-            generated randomly.
+            The custom ID to respond to.
 
         Returns
         -------
         str
             The custom ID that the handler will respond to.
         """
-        if custom_id is None:
-            custom_id = str(uuid.uuid4())
-
         self.custom_id_handlers[custom_id] = handler
         return custom_id
 
-    def custom_handler(self, custom_id: str = None):
+    def custom_handler(self, custom_id: str):
         """
         Returns a decorator to register a handler for a custom ID.
 
         Parameters
         ----------
         custom_id
-            The custom ID to respond to. If not specified, the ID will be
-            generated randomly.
+            The custom ID to respond to.
 
         Returns
         -------
@@ -282,97 +270,61 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
     Handles registering a collection of :class:`Command` s, receiving
     incoming interaction data, and sending/editing/deleting messages via
     webhook.
-
-    Parameters
-    ----------
-    app: Flask
-        The Flask application to bind to.
     """
+    DISCORD_BASE_URL = "https://discord.com/api/v10"
 
-    def __init__(self, app: Flask = None):
+    def __init__(self):
         super().__init__()
+        self.discord_token = None
+        try:
+            self.discord_client_id = os.environ["DISCORD_CLIENT_ID"]
+            self.discord_public_key = os.environ["DISCORD_PUBLIC_KEY"]
+            self.discord_client_secret = os.environ["DISCORD_CLIENT_SECRET"]
+            self.discord_scope = os.getenv("DISCORD_SCOPE", "applications.commands.update")
+            self.DONT_REGISTER_WITH_DISCORD = os.getenv("DONT_REGISTER_WITH_DISCORD", False)
+            self.DONT_VALIDATE_SIGNATURE = os.getenv("DONT_VALIDATE_SIGNATURE", False)
+        except KeyError:
+            raise Exception("Please fill in the .env files with your application's credentials.")
 
-        self.app = app
-        if app is not None:
-            self.init_app(app)
-
-    def init_app(self, app: Flask):
-        """
-        Initialize a Flask app with Discord-specific configuration and
-        attributes.
-
-        Parameters
-        ----------
-        app: Flask
-            The Flask app to initialize.
-        """
-
-        app.config.setdefault("DISCORD_BASE_URL", "https://discord.com/api/v10")
-        app.config.setdefault("DISCORD_CLIENT_ID", "")
-        app.config.setdefault("DISCORD_PUBLIC_KEY", "")
-        app.config.setdefault("DISCORD_CLIENT_SECRET", "")
-        app.config.setdefault("DISCORD_SCOPE", "applications.commands.update")
-        app.config.setdefault("DONT_VALIDATE_SIGNATURE", False)
-        app.config.setdefault("DONT_REGISTER_WITH_DISCORD", False)
-        app.discord_commands = self.discord_commands
-        app.custom_id_handlers = self.custom_id_handlers
-        app.autocomplete_handlers = self.autocomplete_handlers
-        app.discord_token = None
-
-    @static_or_instance
-    def fetch_token(self, app: Flask = None):
+    def fetch_token(self):
         """
         Fetch an OAuth2 token from Discord using the ``CLIENT_ID`` and
         ``CLIENT_SECRET`` with the ``applications.commands.update`` scope. This
         can be used to register new application commands.
-
-        Parameters
-        ----------
-        app
-            The Flask app with the relevant config (client ID and secret).
         """
-
-        if app is None:
-            app = self.app
-
-        if app.config["DONT_REGISTER_WITH_DISCORD"]:
-            app.discord_token = {
+        if self.DONT_REGISTER_WITH_DISCORD:
+            discord_token = {
                 "token_type": "Bearer",
-                "scope": app.config["DISCORD_SCOPE"],
+                "scope": self.discord_scope,
                 "expires_in": 604800,
                 "access_token": "DONT_REGISTER_WITH_DISCORD",
             }
-            app.discord_token["expires_on"] = (
-                time.time() + app.discord_token["expires_in"] / 2
+            discord_token["expires_on"] = (
+                time.time() + discord_token["expires_in"] / 2
             )
-            return
+            return discord_token
 
         response = requests.post(
-            app.config["DISCORD_BASE_URL"] + "/oauth2/token",
+            self.DISCORD_BASE_URL + "/oauth2/token",
             data={
                 "grant_type": "client_credentials",
-                "scope": app.config["DISCORD_SCOPE"],
+                "scope": self.discord_scope,
             },
             headers={"Content-Type": "application/x-www-form-urlencoded"},
-            auth=(app.config["DISCORD_CLIENT_ID"], app.config["DISCORD_CLIENT_SECRET"]),
+            auth=(self.discord_client_id, self.discord_client_secret),
         )
 
         response.raise_for_status()
-        app.discord_token = response.json()
-        app.discord_token["expires_on"] = (
-            time.time() + app.discord_token["expires_in"] / 2
+        discord_token = response.json()
+        discord_token["expires_on"] = (
+            time.time() + discord_token["expires_in"] / 2
         )
+        return discord_token
 
-    @staticmethod
-    def auth_headers(app: Flask):
+    def auth_headers(self):
         """
         Get the Authorization header required for HTTP requests to the
         Discord API.
-
-        Parameters
-        ----------
-        app: Flask
-            The Flask app with the relevant access token.
 
         Returns
         -------
@@ -380,11 +332,11 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The Authorization header.
         """
 
-        if app.discord_token is None or time.time() > app.discord_token["expires_on"]:
-            DiscordInteractions.fetch_token(app)
-        return {"Authorization": f"Bearer {app.discord_token['access_token']}"}
+        if self.discord_token is None or time.time() > self.discord_token["expires_on"]:
+            self.discord_token = self.fetch_token()
+        return {"Authorization": f"Bearer {self.discord_token['access_token']}"}
 
-    def update_commands(self, app: Flask = None, guild_id: str = None):
+    def update_commands(self, guild_id: str = None):
         """
         Update the list of commands registered with Discord.
         This method will overwrite all existing commands.
@@ -396,33 +348,28 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         Parameters
         ----------
-        app: Flask
-            The Flask app with the relevant Discord access token.
         guild_id: str
             The ID of the Discord guild to register commands to. If omitted,
             the commands are registered globally.
         """
 
-        if app is None:
-            app = self.app
-
         if guild_id:
             url = (
-                f"{app.config['DISCORD_BASE_URL']}/applications/"
-                f"{app.config['DISCORD_CLIENT_ID']}/"
+                f"{self.DISCORD_BASE_URL}/applications/"
+                f"{self.discord_client_id}/"
                 f"guilds/{guild_id}/commands"
             )
         else:
             url = (
-                f"{app.config['DISCORD_BASE_URL']}/applications/"
-                f"{app.config['DISCORD_CLIENT_ID']}/commands"
+                f"{self.DISCORD_BASE_URL}/applications/"
+                f"{self.discord_client_id}/commands"
             )
 
-        overwrite_data = [command.dump() for command in app.discord_commands.values()]
+        overwrite_data = [command.dump() for command in self.discord_commands.values()]
 
-        if not app.config["DONT_REGISTER_WITH_DISCORD"]:
+        if not self.DONT_REGISTER_WITH_DISCORD:
             response = requests.put(
-                url, json=overwrite_data, headers=self.auth_headers(app)
+                url, json=overwrite_data, headers=self.auth_headers()
             )
 
             try:
@@ -433,45 +380,24 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
                     f"{response.status_code} {response.text}"
                 )
 
-            self.throttle(response)
-
             for command in response.json():
-                if command["name"] in app.discord_commands:
-                    app.discord_commands[command["name"]].id = command["id"]
+                if command["name"] in self.discord_commands:
+                    self.discord_commands[command["name"]].id = command["id"]
         else:
-            for command in app.discord_commands.values():
+            for command in self.discord_commands.values():
                 command.id = command.name
 
-    @staticmethod
     def build_permission_overwrite_url(
         self,
         command: Command = None,
         *,
         guild_id: str,
         command_id: str = None,
-        token: str = None,
-        app: Flask = None,
-        application_id: str = None,
-        base_url: str = None,
     ):
         """
         Build the URL for getting or setting permission overwrites for a
         specific guild and command.
         """
-        if not app and self and self.app:
-            app = self.app
-
-        if not application_id or not base_url:
-            if app:
-                application_id = app.config["DISCORD_CLIENT_ID"]
-                base_url = app.config["DISCORD_BASE_URL"]
-            else:
-                raise ValueError(
-                    "This method requires the application ID and base URL."
-                    " Either provide these as arguments or provide an app "
-                    " instance with the relevant configuration."
-                )
-
         if command_id is None:
             if command:
                 command_id = command.id
@@ -480,64 +406,20 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
                     "You must supply either a command ID or a Command instance."
                 )
 
-        url = f"{base_url}/applications/{application_id}/guilds/{guild_id}/commands/{command_id}/permissions"
-        auth = (
-            {"Authorization": f"Bearer {token}"}
-            if token
-            else DiscordInteractions.auth_headers(app)
-        )
+        url = f"{self.DISCORD_BASE_URL}/applications/{self.discord_client_id}/guilds/{guild_id}/commands/{command_id}/permissions"
 
-        return url, auth
+        return url
 
-    @static_or_instance
     def get_permission_overwrites(
         self,
         command: Command = None,
         *,
         guild_id: str,
         command_id: str = None,
-        token: str = None,
-        app: Flask = None,
-        application_id: str = None,
-        base_url: str = None,
     ):
         """
         Get the list of permission overwrites in a specific guild for a
-        specific command. You must supply a Bearer token from a user with
-        "Manage Roles" and "Manage Server" permissions in the given guild.
-
-        If the token is omitted, the bot's token will be used. Note that this
-        only works if the bot's developer account is an admin in the guild.
-        This is handy for small bots on your own servers, but you shouldn't
-        rely on this for anything you want others to use in their servers.
-
-        There are a many ways to call this method, here are a few:
-
-        .. code-block:: python
-
-            # Without the app or instance, useful in a background worker
-            DiscordInteractions.get_permission_overwrites(
-                guild_id=...,
-                command_id=...,
-                token=...,
-                application_id=...,
-                base_url=...,
-            )
-
-            # With the instance and app passed in, useful in an app-factory project
-            discord.get_permission_overwrites(
-                guild_id=...,
-                command=...,
-                token=...,
-                app=...,
-            )
-
-            # With the instance and a bound app, using an implicit token
-            # useful in most small projects
-            discord.get_permission_overwrites(
-                guild_id=...,
-                command=...,
-            )
+        specific command.
 
         Parameters
         ----------
@@ -547,16 +429,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The ID of the guild to retrieve permissions from.
         command_id: str
             The ID of the command to retrieve permissions for.
-        token: str
-            A bearer token from an admin of the guild (not including the
-            leading ``Bearer`` word). If omitted, the bot's token will be
-            used instead.
-        app: Flask
-            The Flask app with the relevant Discord application ID.
-        application_id: str
-            The ID of the Discord application to retrieve permissions from.
-        base_url: str
-            The base URL of the Discord API.
 
         Returns
         -------
@@ -564,26 +436,20 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             A list of permission overwrites for the given command.
         """
 
-        url, auth = DiscordInteractions.build_permission_overwrite_url(
-            self,
+        url = self.build_permission_overwrite_url(
             command,
             guild_id=guild_id,
             command_id=command_id,
-            token=token,
-            app=app,
-            application_id=application_id,
-            base_url=base_url,
         )
 
         response = requests.get(
             url,
-            headers=auth,
+            headers=self.auth_headers(),
         )
         response.raise_for_status()
 
         return [Permission.from_dict(perm) for perm in response.json()]
 
-    @static_or_instance
     def set_permission_overwrites(
         self,
         permissions: List[Permission],
@@ -591,19 +457,10 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         *,
         guild_id: str,
         command_id: str = None,
-        token: str = None,
-        app: Flask = None,
-        application_id: str = None,
-        base_url: str = None,
     ):
         """
         Overwrite the list of permission overwrites in a specific guild for a
-        specific command. You must supply a Bearer token from a user with
-        "Manage Roles" and "Manage Server" permissions in the given guild.
-
-        This method requires access to the application ID and base URL. For
-        convenience, it can be called as either an instance method (using the
-        bound app's configuration) or a static method.
+        specific command.
 
         Parameters
         ----------
@@ -613,63 +470,23 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The ID of the guild to retrieve permissions from.
         command_id: str
             The ID of the command to retrieve permissions for.
-        token: str
-            A bearer token from an admin of the guild (not including the
-            leading ``Bearer`` word). If omitted, the bot's token will be
-            used instead.
-        app: Flask
-            The Flask app with the relevant Discord application ID.
-        application_id: str
-            The ID of the Discord application to retrieve permissions from.
-        base_url: str
-            The base URL of the Discord API.
         """
 
-        url, auth = DiscordInteractions.build_permission_overwrite_url(
-            self,
+        url = self.build_permission_overwrite_url(
             command,
             guild_id=guild_id,
             command_id=command_id,
-            token=token,
-            app=app,
-            application_id=application_id,
-            base_url=base_url,
         )
 
         response = requests.put(
             url,
-            headers=auth,
+            headers=self.auth_headers(),
             json={"permissions": [perm.dump() for perm in permissions]},
         )
         response.raise_for_status()
 
-    def throttle(self, response: requests.Response):
-        """
-        Throttle the number of HTTP requests made to Discord
-        using the ``X-RateLimit`` headers
-        https://discord.com/developers/docs/topics/rate-limits
 
-        Parameters
-        ----------
-        response: requests.Response
-            Response object from a previous HTTP request
-        """
-
-        rate_limit_remaining = int(response.headers["X-RateLimit-Remaining"])
-        rate_limit_reset = float(response.headers["X-RateLimit-Reset"])
-        # rate_limit_limit = response.headers["X-RateLimit-Limit"]
-        # rate_limit_bucket = response.headers["X-RateLimit-Bucket"]
-
-        if not rate_limit_remaining:
-            wait_time = rate_limit_reset - time.time()
-            warnings.warn(
-                f"You are being rate limited. Waiting {int(wait_time)} seconds..."
-            )
-            time.sleep(max(wait_time, 0))
-
-    def register_blueprint(
-        self, blueprint: DiscordInteractionsBlueprint, app: Flask = None
-    ):
+    def register_blueprint(self, blueprint: DiscordInteractionsBlueprint):
         """
         Register a :class:`DiscordInteractionsBlueprint` to this
         DiscordInteractions class. Updates this instance's list of
@@ -681,16 +498,10 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         blueprint: DiscordInteractionsBlueprint
             The :class:`DiscordInteractionsBlueprint` to add
             :class:`Command` s from.
-        app: Flask
-            The Flask app with the relevant Discord commands.
         """
-
-        if app is None:
-            app = self.app
-
-        app.discord_commands.update(blueprint.discord_commands)
-        app.custom_id_handlers.update(blueprint.custom_id_handlers)
-        app.autocomplete_handlers.update(blueprint.autocomplete_handlers)
+        self.discord_commands.update(blueprint.discord_commands)
+        self.custom_id_handlers.update(blueprint.custom_id_handlers)
+        self.autocomplete_handlers.update(blueprint.autocomplete_handlers)
 
     def run_command(self, data: dict):
         """
@@ -710,12 +521,12 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         command_name = data["data"]["name"]
 
-        command = current_app.discord_commands.get(command_name)
+        command = self.discord_commands.get(command_name)
 
         if command is None:
             raise ValueError(f"Invalid command name: {command_name}")
 
-        return command.make_context_and_run(discord=self, app=current_app, data=data)
+        return command.make_context_and_run(discord=self, data=data)
 
     def run_handler(self, data: dict, *, allow_modal: bool = True):
         """
@@ -733,7 +544,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The resulting message.
         """
 
-        context = Context.from_data(self, current_app, data)
+        context = Context.from_data(self, data)
         handler = self.custom_id_handlers[context.primary_id]
         args = context.create_handler_args(handler)
         result = handler(context, *args)
@@ -762,7 +573,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The result of the autocomplete handler.
         """
 
-        context = Context.from_data(self, current_app, data)
+        context = Context.from_data(self, data)
         handler = self.autocomplete_handlers[context.command_name]
         args = context.create_autocomplete_args()
         result = handler(context, *args)
@@ -778,27 +589,26 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         request
             The request to verify the signature of.
         """
+        signature = request.get("HTTP_X-Signature-Ed25519")
+        timestamp = request.get("HTTP_X-Signature-Timestamp")
 
-        signature = request.headers.get("X-Signature-Ed25519")
-        timestamp = request.headers.get("X-Signature-Timestamp")
-
-        if current_app.config["DONT_VALIDATE_SIGNATURE"]:
+        if self.DONT_VALIDATE_SIGNATURE:
             return
 
         if signature is None or timestamp is None:
-            abort(401, "Missing signature or timestamp")
+            self.abort(401, "Missing signature or timestamp")
 
-        message = timestamp.encode() + request.data
-        verify_key = VerifyKey(bytes.fromhex(current_app.config["DISCORD_PUBLIC_KEY"]))
+        message = timestamp.encode() + request["raw_data"]
+        verify_key = VerifyKey(bytes.fromhex(self.discord_public_key))
         try:
             verify_key.verify(message, bytes.fromhex(signature))
         except BadSignatureError:
-            abort(401, "Incorrect Signature")
+            self.abort(401, "Incorrect Signature")
 
-        if not request.json:
-            abort(400, "Request JSON required")
+        if not request["data"]:
+            self.abort(400, "Request body required")
 
-    def handle_request(self):
+    def handle_request(self, request):
         """
         Verify the signature in the incoming request and return the Message
         result from the given command.
@@ -810,98 +620,47 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         """
         self.verify_signature(request)
 
-        interaction_type = request.json.get("type")
+        interaction_type = request["json"].get("type")
         if interaction_type == InteractionType.PING:
-            abort(jsonify({"type": ResponseType.PONG}))
+            # abort(jsonify({"type": ResponseType.PONG}))
+            return PongResponse()
         elif interaction_type == InteractionType.APPLICATION_COMMAND:
-            return self.run_command(request.json)
+            return self.run_command(request["json"])
         elif interaction_type == InteractionType.MESSAGE_COMPONENT:
-            return self.run_handler(request.json)
+            return self.run_handler(request["json"])
         elif interaction_type == InteractionType.APPLICATION_COMMAND_AUTOCOMPLETE:
-            return self.run_autocomplete(request.json)
+            return self.run_autocomplete(request["json"])
         elif interaction_type == InteractionType.MODAL_SUBMIT:
-            return self.run_handler(request.json, allow_modal=False)
+            return self.run_handler(request["json"], allow_modal=False)
         else:
             raise RuntimeWarning(
                 f"Interaction type {interaction_type} is not yet supported"
             )
 
-    def set_route(self, route: str, app: Flask = None):
+    def __call__(self, environ, start_response):
         """
-        Add a route handler to the Flask app that handles incoming
-        interaction data.
-
-        If you are using Quart, you should use
-        :meth:`.DiscordInteractions.set_route_async` instead.
-
-        Parameters
-        ----------
-        route: str
-            The URL path to receive interactions on.
-        app: Flask
-            The Flask app to add the route to.
+        Handles incoming interaction data
+        (WSGI)
         """
-
-        if app is None:
-            app = self.app
-
-        @app.route(route, methods=["POST"])
-        def interactions():
-            result = self.handle_request()
+        try:
+            try:
+                data = environ.copy()
+                raw_data = environ["wsgi.input"].read()
+                data["json"] = json.load(raw_data)
+                data["raw_data"] = raw_data
+            except json.JSONDecodeError:
+                self.abort(400, "Malformed or missing JSON body")
+            result = self.handle_request(data)
             response, mimetype = result.encode()
-            return Response(response, mimetype=mimetype)
+            status = "200 OK"
+            response_headers = [("Content-Type", mimetype)]
+            start_response(status, response_headers)
+            return [response.encode("UTF-8")]
+        except AbortError as err:
+            status = err.http_code
+            response_headers = [("Content-Type", "application/json")]
+            start_response(status, response_headers)
+            return [json.dumps({"result": "no"}).encode("UTF-8")]
 
-    def set_route_async(self, route: str, app: Flask = None):
-        """
-        Add a route handler to a Quart app that handles incoming interaction
-        data using asyncio.
-
-        This function also sets up the aiohttp ClientSession that is used
-        for sending followup messages, etc.
-
-        Parameters
-        ----------
-        route: str
-            The URL path to receive interactions on.
-        app: Flask
-            The Quart app to add the route to.
-        """
-
-        if app is None:
-            app = self.app
-
-        if aiohttp is None:
-            raise ImportError(
-                "The aiohttp module is required for async usage of this library"
-            )
-
-        @app.route(route, methods=["POST"])
-        async def interactions():
-            result = self.handle_request()
-
-            if inspect.isawaitable(result):
-                result = await result
-
-            response, mimetype = result.encode()
-            return Response(response, mimetype=mimetype)
-
-        # Set up the aiohttp ClientSession
-
-        async def create_session():
-            app.discord_client_session = aiohttp.ClientSession(
-                headers=self.auth_headers(app), raise_for_status=True
-            )
-
-        async def close_session():
-            await app.discord_client_session.close()
-
-        if hasattr(app, "before_serving"):
-            # Quart apps
-            app.before_serving(create_session)
-            app.after_serving(close_session)
-        else:
-            # Flask apps
-            app.before_first_request(create_session)
-            atexit.register(
-                lambda: asyncio.get_event_loop().run_until_complete(close_session())
-            )
+    def abort(self, code: int, reason: str) -> NoReturn:
+        raise AbortError(f"{code} {reason}")

@@ -176,14 +176,8 @@ class Message(LoadableDataclass):
         Message
             A ``Message`` object representing the return value.
         """
-
-        async def construct_async(result):
-            return cls.from_return_value(await result)
-
         if result is None:
             return cls()
-        elif inspect.isawaitable(result):
-            return construct_async(result)
         elif isinstance(result, cls):
             return result
         else:

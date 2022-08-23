@@ -2,10 +2,8 @@ from dataclasses import dataclass
 from typing import Callable, List, Optional, Union, TYPE_CHECKING
 import inspect
 import itertools
-import types
 
 import requests
-from flask import Flask
 
 from flask_discord_interactions.models import (
     LoadableDataclass,
@@ -102,7 +100,6 @@ class Context(LoadableDataclass):
     locale: Optional[str] = None
     guild_locale: Optional[str] = None
     app_permissions: Optional[str] = None
-    app: Flask = None
     discord: "DiscordInteractions" = None
 
     custom_id: str = None
@@ -114,18 +111,12 @@ class Context(LoadableDataclass):
 
     @classmethod
     def from_data(
-        cls, discord: "DiscordInteractions" = None, app: Flask = None, data={}
+        cls, discord: "DiscordInteractions" = None, data = None
     ):
         if data is None:
             data = {}
 
-        # If this is a proxy (e.g. flask.current_app), get the current object
-        # https://flask.palletsprojects.com/en/2.0.x/reqcontext/#notes-on-proxies
-        if hasattr(app, "_get_current_object"):
-            app = app._get_current_object()
-
         result = cls(
-            app=app,
             discord=discord,
             id=data.get("id"),
             type=data.get("type"),
@@ -140,7 +131,7 @@ class Context(LoadableDataclass):
             resolved=data.get("data", {}).get("resolved", {}),
             command_name=data.get("data", {}).get("name"),
             command_id=data.get("data", {}).get("id"),
-            custom_id=data.get("data", {}).get("custom_id") or "",
+            custom_id=data.get("data", {}).get("custom_id", ""),
             target_id=data.get("data", {}).get("target_id"),
             locale=data.get("locale"),
             guild_locale=data.get("guild_locale"),
@@ -159,10 +150,7 @@ class Context(LoadableDataclass):
 
     @property
     def auth_headers(self):
-        if self.discord:
-            return self.discord.auth_headers(self.app)
-        else:
-            return self.frozen_auth_headers
+        return self.discord.auth_headers()
 
     def parse_author(self, data: dict):
         """
@@ -395,8 +383,8 @@ class Context(LoadableDataclass):
         """
 
         url = (
-            f"{self.app.config['DISCORD_BASE_URL']}/webhooks/"
-            f"{self.app.config['DISCORD_CLIENT_ID']}/{self.token}"
+            f"{self.discord.DISCORD_BASE_URL}/webhooks/"
+            f"{self.discord.discord_client_id}/{self.token}"
         )
         if message is not None:
             url += f"/messages/{message}"
@@ -418,7 +406,7 @@ class Context(LoadableDataclass):
 
         updated = Message.from_return_value(updated)
 
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
+        if not self.discord or self.discord.DONT_REGISTER_WITH_DISCORD:
             return
 
         response, mimetype = updated.encode(followup=True)
@@ -440,7 +428,7 @@ class Context(LoadableDataclass):
             If omitted, deletes the original message.
         """
 
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
+        if not self.discord or self.discord.DONT_REGISTER_WITH_DISCORD:
             return
 
         response = requests.delete(self.followup_url(message))
@@ -456,7 +444,7 @@ class Context(LoadableDataclass):
             The :class:`Message` to send as a followup message.
         """
 
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
+        if not self.discord or self.discord.DONT_REGISTER_WITH_DISCORD:
             return
 
         message = Message.from_return_value(message)
@@ -481,27 +469,9 @@ class Context(LoadableDataclass):
             return self.command_id
         else:
             try:
-                return self.app.discord_commands[command_name].id
+                return self.discord.discord_commands[command_name].id
             except KeyError:
                 raise ValueError(f"Unknown command: {command_name}")
-
-    def freeze(self):
-        "Return a copy of this Context that can be pickled for RQ and Celery."
-
-        app = types.SimpleNamespace()
-
-        CONFIG_KEYS = [
-            "DISCORD_BASE_URL",
-            "DISCORD_CLIENT_ID",
-            "DONT_REGISTER_WITH_DISCORD",
-        ]
-
-        app.config = {key: self.app.config[key] for key in CONFIG_KEYS}
-
-        new_context = Context.from_data(app=app, data=self.data)
-        new_context.frozen_auth_headers = self.auth_headers
-
-        return new_context
 
     def get_component(self, component_id: str):
         """
@@ -520,83 +490,3 @@ class Context(LoadableDataclass):
                 if component.custom_id == component_id:
                     return component
         raise LookupError("The specified component was not found.")
-
-
-@dataclass
-class AsyncContext(Context):
-    """
-    Represents the context in which an asynchronous :class:`Command` is
-    invoked. Also provides coroutine functions to handle followup messages.
-
-    Users should not need to instantiate this class manually.
-    """
-
-    def __post_init__(self):
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
-            return
-
-        self.session = self.app.discord_client_session
-
-    async def edit(self, updated: Union[str, Message], message: str = "@original"):
-        """
-        Edit an existing message.
-
-        Parameters
-        ----------
-        updated: Union[str, Message]
-            The updated Message to edit the message to.
-        message: str
-            The ID of the message to edit.
-            If omitted, edits the original message.
-        """
-
-        updated = Message.from_return_value(updated)
-
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
-            return
-
-        response, mimetype = updated.encode(followup=True)
-        await self.session.patch(
-            self.followup_url(message),
-            data=response,
-            headers={"Content-Type": mimetype},
-        )
-
-    async def delete(self, message: str = "@original"):
-        """
-        Delete an existing message.
-
-        Parameters
-        ----------
-        message: str
-            The ID of the message to delete.
-            If omitted, deletes the original message.
-        """
-
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
-            return
-
-        await self.session.delete(self.followup_url(message))
-
-    async def send(self, message: Union[Message, str]):
-        """
-        Send a new followup message.
-
-        Parameters
-        ----------
-        message: Union[Message, str]
-            The Message object to send as a followup message.
-        """
-
-        message = Message.from_return_value(message)
-
-        if not self.app or self.app.config["DONT_REGISTER_WITH_DISCORD"]:
-            return
-
-        response, mimetype = message.encode(followup=True)
-        async with self.session.post(
-            self.followup_url(),
-            data=response,
-            headers={"Content-Type": mimetype},
-        ) as message:
-            return (await message.json())["id"]

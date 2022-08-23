@@ -5,7 +5,7 @@ from flask_discord_interactions.command import (
     SlashCommandGroup,
 )
 
-from flask_discord_interactions.context import Context, AsyncContext
+from flask_discord_interactions.context import Context
 
 from flask_discord_interactions.models import (
     ApplicationCommandType,
@@ -52,7 +52,6 @@ __all__ = [
     "SlashCommandSubgroup",
     "SlashCommandGroup",
     "Context",
-    "AsyncContext",
     "CommandOptionType",
     "ApplicationCommandType",
     "ChannelType",

@@ -5,9 +5,7 @@ import itertools
 
 from typing import Callable, List, Dict, TYPE_CHECKING
 
-from flask import Flask
-
-from flask_discord_interactions.context import Context, AsyncContext
+from flask_discord_interactions.context import Context
 from flask_discord_interactions.models import (
     Message,
     Modal,
@@ -131,8 +129,6 @@ class Command:
         else:
             self.description = None
 
-        self.is_async = inspect.iscoroutinefunction(self.command)
-
         if self.options:
             self.options = [
                 (o.dump() if isinstance(o, Option) else o) for o in self.options
@@ -208,7 +204,7 @@ class Command:
                 self.options.append(option)
 
     def make_context_and_run(
-        self, *, discord: "DiscordInteractions", app: Flask, data: dict
+        self, *, discord: "DiscordInteractions", data: dict
     ):
         """
         Creates the :class:`Context` object for an invocation of this
@@ -219,8 +215,6 @@ class Command:
         discord: DiscordInteractions
             The :class:`DiscordInteractions` object used to receive this
             interaction.
-        app: Flask
-            The Flask app used to receive this interaction.
         data: dict
             The incoming interaction data.
 
@@ -230,10 +224,7 @@ class Command:
             The response by the command, converted to a Message object.
         """
 
-        if self.is_async:
-            context = AsyncContext.from_data(discord, app, data)
-        else:
-            context = Context.from_data(discord, app, data)
+        context = Context.from_data(discord, data)
         args, kwargs = context.create_args()
 
         result = self.run(context, *args, **kwargs)
@@ -316,9 +307,6 @@ class SlashCommandSubgroup(Command):
         The description of this subgroup, shown in the Discord client.
     description_localizations: Dict[str, str]
         A dict of localized descriptions for this subgroup.
-    is_async: bool
-        Whether the subgroup should be considered async (if subcommands
-        get an :class:`AsyncContext` instead of a :class:`Context`.)
     """
 
     def __init__(
@@ -328,7 +316,6 @@ class SlashCommandSubgroup(Command):
         *,
         name_localizations: Dict[str, str] = None,
         description_localizations: Dict[str, str] = None,
-        is_async: bool = False,
     ):
         self.name = name
         self.description = description
@@ -339,8 +326,6 @@ class SlashCommandSubgroup(Command):
 
         self.default_member_permissions = None
         self.dm_permission = None
-
-        self.is_async = is_async
 
     def command(
         self,
@@ -440,9 +425,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
         The description of this subgroup, shown in the Discord client.
     description_localizations: Dict[str, str]
         A dict of localized descriptions for this subgroup.
-    is_async: bool
-        Whether the subgroup should be considered async (if subcommands
-        get an :class:`AsyncContext` instead of a :class:`Context`.)
     default_member_permissions: int
         Permission integer setting permission defaults for a command
     dm_permission: int
@@ -454,7 +436,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
         name,
         description,
         *,
-        is_async=False,
         default_member_permissions=None,
         dm_permission=None,
         name_localizations=None,
@@ -470,8 +451,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
         self.name_localizations = name_localizations
         self.description_localizations = description_localizations
 
-        self.is_async = is_async
-
     def subgroup(
         self,
         name: str,
@@ -479,7 +458,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
         *,
         name_localizations: Dict[str, str] = None,
         description_localizations: Dict[str, str] = None,
-        is_async: bool = False,
     ):
         """
         Create a new :class:`SlashCommandSubroup`
@@ -495,9 +473,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
             The description of the subgroup. Defaults to "No description".
         description_localizations: Dict[str, str]
             A dict of localized descriptions for the subgroup.
-        is_async: bool
-            Whether the subgroup should be considered async (if subcommands
-            get an :class:`AsyncContext` instead of a :class:`Context`.)
         """
 
         group = SlashCommandSubgroup(
@@ -505,7 +480,6 @@ class SlashCommandGroup(SlashCommandSubgroup):
             description,
             name_localizations=name_localizations,
             description_localizations=description_localizations,
-            is_async=is_async,
         )
         self.subcommands[name] = group
         return group

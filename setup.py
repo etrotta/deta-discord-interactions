@@ -18,8 +18,7 @@ setup(
     zip_safe=False,
     include_package_data=True,
     platforms="any",
-    install_requires=["Flask", "requests", "PyNaCl", "requests-toolbelt"],
-    extras_require={"async": ["Quart", "aiohttp"]},
+    install_requires=["requests", "PyNaCl", "requests-toolbelt"],
     tests_require=["pytest"],
     classifiers=[
         "Environment :: Web Environment",

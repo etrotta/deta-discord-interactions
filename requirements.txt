@@ -1,4 +1,3 @@
-flask
 requests
 requests-toolbelt
 pynacl
