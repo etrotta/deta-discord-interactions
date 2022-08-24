@@ -592,18 +592,36 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         signature = request.get("HTTP_X-Signature-Ed25519")
         timestamp = request.get("HTTP_X-Signature-Timestamp")
 
+        print(request.keys())
+
         if self.DONT_VALIDATE_SIGNATURE:
             return
 
         if signature is None or timestamp is None:
             self.abort(401, "Missing signature or timestamp")
 
-        message = timestamp.encode() + request["raw_data"]
+        message = f"{timestamp}{request['raw_data'].decode('UTF-8')}".encode("UTF-8")
         verify_key = VerifyKey(bytes.fromhex(self.discord_public_key))
         try:
             verify_key.verify(message, bytes.fromhex(signature))
         except BadSignatureError:
-            self.abort(401, "Incorrect Signature")
+            try:
+                body = (
+                    json.dumps(
+                        json.loads(
+                            request['raw_data'].decode('UTF-8')
+                        ),
+                        separators=(',', ':'),
+                    )
+                    .encode('UTF-8')
+                )
+                message = f"{timestamp}{body}".encode("UTF-8")
+                verify_key.verify(message, bytes.fromhex(signature))
+            except BadSignatureError:
+                self.abort(401, "Incorrect Signature")
+            else:
+                import warnings
+                warnings.warn("The whitespace for the request data may have been modified before being sent to discord-interactions")
 
         if not request["data"]:
             self.abort(400, "Request body required")
@@ -660,7 +678,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             status = err.http_code
             response_headers = [("Content-Type", "application/json")]
             start_response(status, response_headers)
-            return [json.dumps({"result": "no"}).encode("UTF-8")]
+            return [json.dumps({"error": status}).encode("UTF-8")]
 
     def abort(self, code: int, reason: str) -> NoReturn:
         raise AbortError(f"{code} {reason}")
