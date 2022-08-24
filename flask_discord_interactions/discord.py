@@ -589,10 +589,10 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         request
             The request to verify the signature of.
         """
-        signature = request.get("HTTP_X-Signature-Ed25519")
-        timestamp = request.get("HTTP_X-Signature-Timestamp")
-
-        print(request.keys())
+        # signature = request.get("X-Signature-Ed25519")
+        # timestamp = request.get("X-Signature-Timestamp")
+        signature = request.get("HTTP_X_SIGNATURE_ED25519")
+        timestamp = request.get("HTTP_X_SIGNATURE_TIMESTAMP")
 
         if self.DONT_VALIDATE_SIGNATURE:
             return
