@@ -646,9 +646,9 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             try:
                 data = environ.copy()
                 raw_data = environ["wsgi.input"].read()
-                data["json"] = json.load(raw_data)
+                data["json"] = json.loads(raw_data.decode("UTF-8"))
                 data["raw_data"] = raw_data
-            except json.JSONDecodeError:
+            except Exception:
                 self.abort(400, "Malformed or missing JSON body")
             result = self.handle_request(data)
             response, mimetype = result.encode()
