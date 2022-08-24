@@ -17,7 +17,7 @@ from flask_discord_interactions.models import Message, Modal, ResponseType, Perm
 
 
 class AbortError(Exception):
-    def __init__(self, http_code: int):
+    def __init__(self, http_code):
         self.http_code = http_code
 
 class PongResponse:
@@ -622,9 +622,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             else:
                 import warnings
                 warnings.warn("The whitespace for the request data may have been modified before being sent to discord-interactions")
-
-        if not request["data"]:
-            self.abort(400, "Request body required")
 
     def handle_request(self, request):
         """
