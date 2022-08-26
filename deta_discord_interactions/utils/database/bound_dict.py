@@ -54,22 +54,31 @@ class BoundDict(dict):
             )
 
     def __getattribute__(self, __name: str) -> Any:
+        if __name in ('_TRACKED_DICT_METHODS', '_BOUND_DICT_METHODS'):
+            return super().__getattribute__(__name)
+
         if __name in self._TRACKED_DICT_METHODS or __name in self._BOUND_DICT_METHODS:
             function = super().__getattribute__(__name)
             @wraps(function)
             def wrapped(*args, **kwargs):
                 result = function(*args, **kwargs)
-                if __name in self._BOUND_DICT_METHODS:
+                if __name in self._BOUND_DICT_METHODS:  
+                    # Methods that modify the dictionary
                     if self._bound_record._preparing_statement:
+                        # Prepare a database update operation
                         self._bound_record._prepared_statement[
                             self._bound_key
                         ] = dict(self)
                     else:
+                        # Updates the database data right way
                         self._bound_record._database.update(
                             self._bound_record.key,
                             {self._bound_key: dict(self)}
                         )
+                    # Updates the in-memory data
+                    self._bound_record._data[self._bound_key] = dict(self)
                 if __name in self._TRACKED_DICT_METHODS:
+                    # Methods that may return something
                     result = self._check_bind(result, args[0])
                 return result
             return wrapped

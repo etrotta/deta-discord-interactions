@@ -10,8 +10,8 @@ from functools import wraps
 class BoundList(list):
     """List which updates the database when modified.
     If you wish to make changes without affecting the database, use list.copy()
-    Magic methods not supported yet. 
-    Avoid using `del list[i]`, `dict += something` etc for now.
+    Most Magic methods are not supported yet. 
+    Avoid using `del list[i]`, `list += something` etc for now.
     """
     _BOUND_LIST_METHODS = ('pop', 'clear', 'extend', 'remove', 'reverse', 'sort')
     def __init__(self, bound_key: str, bound_record: 'Record', *argument):

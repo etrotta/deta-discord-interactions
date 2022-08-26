@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import typing
 from typing import Optional, Union
+import typing
+from deta_discord_interactions.utils.database.exceptions import KeyNotFound
 from deta_discord_interactions.utils.database.record import Record
 from deta_discord_interactions.utils.database.adapters import transform_identifier
+from deta_discord_interactions.utils.database.query import Query
 
-if typing.TYPE_CHECKING:
-    from deta_discord_interactions.utils.database.query import Query
+from datetime import datetime
 
 try:
     from deta import Base
@@ -16,6 +17,9 @@ except ImportError:
     # import warnings
     # warnings.warn("Failed to import deta. Any database operations will fail.")
     HAS_BASE = False
+
+
+EMPTY_DICTIONARY_STRING = "$EMPTY_DICT$"  # Setting a field to an empty dictionaries seems to set it to `null`
 
 
 class Database:
@@ -33,19 +37,64 @@ class Database:
         key = transform_identifier(key)
         self.put(key, data)
     
+    @typing.overload
+    def encode_entry(self, record: dict) -> dict: ...
+    @typing.overload
+    def encode_entry(self, record: list) -> list: ...
+    def encode_entry(self, record: Union[dict, list]) -> Union[dict, list]:
+        "Converts values so that we can store it properly in Deta Base"
+        if isinstance(record, dict):
+            it = record.items()
+        else:
+            it = enumerate(record)
+        for key, value in it:
+            if value == {}:  # Empty dict becomes `null` on deta base
+                record[key] = EMPTY_DICTIONARY_STRING
+            elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
+                record[key] = self.encode_entry(value)
+            elif isinstance(value, datetime):  # Ease datetime conversion
+                record[key] = datetime.toisoformat()
+        return record
+
+    @typing.overload
+    def decode_entry(self, record: dict) -> dict: ...
+    @typing.overload
+    def decode_entry(self, record: list) -> list: ...
+    def decode_entry(self, record):
+        "Converts back some changes that we have to make when storing"
+        if isinstance(record, dict):
+            it = record.items()
+        else:
+            it = enumerate(record)
+        for key, value in it:
+            if value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
+                record[key] = {}
+            elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
+                record[key] = self.decode_entry(value)
+            elif isinstance(value, str):  # Ease datetime conversion
+                try:
+                    record[key] = datetime.fromisoformat(value)
+                except ValueError:
+                    pass
+        return record
+
+
     def get(self, key: str) -> Record:
         "Retrieve a record based on it's key."
         if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed!")
         key = transform_identifier(key)
-        return Record(key, self, self.__base.get(key) or {})
+        data = self.__base.get(key)
+        if data is None:
+            data = {}
+        return Record(key, self, self.decode_entry(data))
 
     def insert(self, key: str, data: dict) -> Record:
         "Insert a record and return it."
         if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         key = transform_identifier(key)
-        self.__base.insert(data, key)
+        self.__base.insert(self.encode_entry(data), key)
         return Record(key, self, data)
     
     def put(self, key: str, data: dict) -> Record:
@@ -53,17 +102,19 @@ class Database:
         if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         key = transform_identifier(key)
-        self.__base.put(data, key)
+        self.__base.put(self.encode_entry(data), key)
         return Record(key, self, data)
     
     def put_many(self, data: list[dict]) -> list[Record]:
         "Insert or update multiple records and return them."
         if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
-        if not all('key' in record for record in data):
-            raise ValueError("All dictionaries must have a `key` when using put_many.")
+        for record in data:
+            if 'key' not in record:
+                raise ValueError("All dictionaries must have a `key` when using put_many.")
+            self.encode_entry(record)
         self.__base.put_many(data)
-        return [Record(record['key'], self, record) for record in data]
+        return [Record(record['key'], self, self.decode_entry(record)) for record in data]
 
     def fetch(
         self,
@@ -80,7 +131,7 @@ class Database:
             query = query.to_list()
         result = self.__base.fetch(query, limit=limit, last=last)
         return [
-            Record(record['key'], self, record)
+            Record(record['key'], self, self.decode_entry(record))
             for record in result.items
         ]
     
@@ -116,7 +167,7 @@ class Database:
                 return Util.Prepend(value)
             elif dict_key == '$trim':
                 return Util.Trim()
-        
+
         def travel(dictionary: dict):
             "Modify the dictionary to replace special keys"
             for dict_key, value in dictionary.items():
@@ -131,5 +182,14 @@ class Database:
                         travel(sub)
         
         travel(updates)
-        self.__base.update(updates, key)
+        self.encode_entry(updates)
+        try:
+            self.__base.update(updates, key)
+        except Exception as err:
+            import re
+            reason = err.args[0] if err.args else ''
+            if re.fullmatch(r"Key \'.*\' not found", reason):
+                raise KeyNotFound(reason)
+            else:
+                raise
         return Record(key, self, None)

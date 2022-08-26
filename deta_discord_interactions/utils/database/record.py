@@ -4,6 +4,7 @@ import typing
 from typing import Any, Optional
 from deta_discord_interactions.utils.database.bound_list import BoundList
 from deta_discord_interactions.utils.database.bound_dict import BoundDict
+from deta_discord_interactions.utils.database.exceptions import KeyNotFound
 if typing.TYPE_CHECKING:
     from deta_discord_interactions.utils.database.database import Database
 
@@ -26,15 +27,23 @@ class Record:
         self._preparing_statement = True
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         self._preparing_statement = False
-        self._database.update(self.key, self._prepared_statement)
+        if exc_type is not None:
+            import warnings
+            warnings.warn("Aborting prepared operation since an Exception was raised.")
+        else:
+            try:
+                self._database.update(self.key, self._prepared_statement)
+            except KeyNotFound:
+                self._database.put(self.key, {})
+                self._database.update(self.key, self._prepared_statement)
         self._prepared_statement = {}
 
-    def __dict__(self):
+    def __iter__(self):
         if self._data is None:
             self._data = self._database.get(self.key)._data
-        return dict(self._data)
+        yield from self._data.items()
 
     def __getattr__(self, attribute: str) -> Any:
         if self._data is None:
@@ -55,7 +64,10 @@ class Record:
         if self._preparing_statement:
             self._prepared_statement[attribute] = value
         else:
-            self._database.update(self.key, {attribute: value})
+            try:
+                self._database.update(self.key, {attribute: value})
+            except KeyNotFound:
+                self._database.put(self.key, {attribute: value})
             self._data = None
 
     def __getitem__(self, key: str) -> Any:
@@ -72,7 +84,10 @@ class Record:
         if self._preparing_statement:
             self._prepared_statement[key] = value
         else:
-            self._database.update(self.key, {key: value})
+            try:
+                self._database.update(self.key, {key: value})
+            except KeyNotFound:
+                self._database.put(self.key, {key: value})
             self._data = None
 
     def __delattr__(self, attribute: str) -> None:
