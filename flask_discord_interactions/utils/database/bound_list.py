@@ -13,22 +13,22 @@ class BoundList(list):
     Magic methods not supported yet. 
     Avoid using `del list[i]`, `dict += something` etc for now.
     """
-    __BOUND_LIST_METHODS = ('pop', 'clear', 'extend', 'remove', 'reverse', 'sort')
+    _BOUND_LIST_METHODS = ('pop', 'clear', 'extend', 'remove', 'reverse', 'sort')
     def __init__(self, bound_key: str, bound_record: 'Record', *argument):
-        self.__bound_key = bound_key
-        self.__bound_record = bound_record
+        self._bound_key = bound_key
+        self._bound_record = bound_record
         super().__init__(*argument)
 
     def append(self, item):
         super().append(item)
-        if self.__bound_record.__preparing_statement:
-            self.__bound_record.__prepared_statement[
-                self.__bound_key
+        if self._bound_record._preparing_statement:
+            self._bound_record._prepared_statement[
+                self._bound_key
             ] = list(self)
         else:
-            self.__bound_record.__database.update(
-                self.__bound_record.key,
-                {"$append": {self.__bound_key: item}}
+            self._bound_record._database.update(
+                self._bound_record.key,
+                {"$append": {self._bound_key: item}}
             )
     
     # def __getitem__(self, index):
@@ -37,33 +37,33 @@ class BoundList(list):
     #         return result
     #     if isinstance(result, list):
     #         result = BoundList(
-    #             f'{self.__bound_key}.{index}',
-    #             self.__bound_record,
+    #             f'{self._bound_key}.{index}',
+    #             self._bound_record,
     #             result,
     #         )
     #     elif isinstance(result, dict):
     #         from flask_discord_interactions.utils.database.bound_dict import BoundDict
     #         result = BoundDict(
-    #             f'{self.__bound_key}.{index}',
-    #             self.__bound_record,
+    #             f'{self._bound_key}.{index}',
+    #             self._bound_record,
     #             result,
     #         )
     #     return result
 
     def __getattribute__(self, __name: str) -> Any:
-        if __name in self.__BOUND_LIST_METHODS:
+        if __name in self._BOUND_LIST_METHODS:
             function = super().__getattribute__(__name)
             @wraps(function)
             def wrapped(*args, **kwargs):
                 result = function(*args, **kwargs)
-                if self.__bound_record.__preparing_statement:
-                    self.__bound_record.__prepared_statement[
-                        self.__bound_key
+                if self._bound_record._preparing_statement:
+                    self._bound_record._prepared_statement[
+                        self._bound_key
                     ] = list(self)
                 else:
-                    self.__bound_record.__database.update(
-                        self.__bound_record.key,
-                        {self.__bound_key: list(self)}
+                    self._bound_record._database.update(
+                        self._bound_record.key,
+                        {self._bound_key: list(self)}
                     )
                 return result
             return wrapped

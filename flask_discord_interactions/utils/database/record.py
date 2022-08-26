@@ -17,30 +17,30 @@ class Record:
         data: Optional[dict] = None,
     ):
         self.key = key
-        self.__database = database
-        self.__data = data
-        self.__preparing_statement = False
-        self.__prepared_statement = {}
+        self._database = database
+        self._data = data
+        self._preparing_statement = False
+        self._prepared_statement = {}
 
     def __enter__(self):
-        self.__preparing_statement = True
+        self._preparing_statement = True
         return self
 
     def __exit__(self, *args):
-        self.__preparing_statement = False
-        self.__database.update(self.key, self.__prepared_statement)
-        self.__prepared_statement = {}
+        self._preparing_statement = False
+        self._database.update(self.key, self._prepared_statement)
+        self._prepared_statement = {}
 
     def __dict__(self):
-        if self.__data is None:
-            self.__data = self.__database.get(self.key).__data
-        return dict(self.__data)
+        if self._data is None:
+            self._data = self._database.get(self.key)._data
+        return dict(self._data)
 
     def __getattr__(self, attribute: str) -> Any:
-        if self.__data is None:
-            self.__data = self.__database.get(self.key).__data
+        if self._data is None:
+            self._data = self._database.get(self.key)._data
         try:
-            result = self.__data[attribute]
+            result = self._data[attribute]
         except KeyError:
             raise AttributeError
         if isinstance(result, list):
@@ -50,16 +50,18 @@ class Record:
         return result
 
     def __setattr__(self, attribute: str, value: Any) -> None:
-        if self.__preparing_statement:
-            self.__prepared_statement[attribute] = value
+        if attribute in ('key', 'setdefault') or attribute.startswith("_"):
+            return super().__setattr__(attribute, value)
+        if self._preparing_statement:
+            self._prepared_statement[attribute] = value
         else:
-            self.__database.update(self.key, {attribute: value})
-            self.__data = None
+            self._database.update(self.key, {attribute: value})
+            self._data = None
 
     def __getitem__(self, key: str) -> Any:
-        if self.__data is None:
-            self.__data = self.__database.get(self.key).__data
-        result = self.__data[key]
+        if self._data is None:
+            self._data = self._database.get(self.key)._data
+        result = self._data[key]
         if isinstance(result, list):
             result = BoundList(key, self, result)
         elif isinstance(result, dict):
@@ -67,15 +69,15 @@ class Record:
         return result
 
     def __setitem__(self, key: str, value: Any) -> None:
-        if self.__preparing_statement:
-            self.__prepared_statement[key] = value
+        if self._preparing_statement:
+            self._prepared_statement[key] = value
         else:
-            self.__database.update(self.key, {key: value})
-            self.__data = None
+            self._database.update(self.key, {key: value})
+            self._data = None
 
     def __delattr__(self, attribute: str) -> None:
-        del self.__data[attribute]
-        self.__database.update(self.key, {"$trim": {attribute: 1}})
+        del self._data[attribute]
+        self._database.update(self.key, {"$trim": {attribute: 1}})
 
     def setdefault(self, key: str, value: Any) -> Any:
         try:

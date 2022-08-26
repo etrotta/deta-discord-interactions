@@ -35,14 +35,14 @@ class Database:
     
     def get(self, key: str) -> Record:
         "Retrieve a record based on it's key."
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed!")
         key = transform_identifier(key)
         return Record(key, self, self.__base.get(key) or {})
 
     def insert(self, key: str, data: dict) -> Record:
         "Insert a record and return it."
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         key = transform_identifier(key)
         self.__base.insert(data, key)
@@ -50,7 +50,7 @@ class Database:
     
     def put(self, key: str, data: dict) -> Record:
         "Insert or update a record and return it."
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         key = transform_identifier(key)
         self.__base.put(data, key)
@@ -58,7 +58,7 @@ class Database:
     
     def put_many(self, data: list[dict]) -> list[Record]:
         "Insert or update multiple records and return them."
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         if not all('key' in record for record in data):
             raise ValueError("All dictionaries must have a `key` when using put_many.")
@@ -74,7 +74,7 @@ class Database:
         """Returns multiple items from the database based on a query.
         See the `Query` class and https://docs.deta.sh/docs/base/queries/ for more information
         """
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         if isinstance(query, Query):
             query = query.to_list()
@@ -102,7 +102,7 @@ class Database:
         
         Note: The returned Record must fetch back the updated data
         """
-        if not HAS_BASE:
+        if self.__base is None:
             raise AssertionError("Cannot access the Database without deta installed")
         key = transform_identifier(key)
         special = ('$increment', '$append', '$prepend', '$trim')
