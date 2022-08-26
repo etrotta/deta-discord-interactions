@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 from typing import Optional, Union
 from flask_discord_interactions.utils.database.record import Record

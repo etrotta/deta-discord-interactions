@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import typing
 from typing import Any, Optional
 from flask_discord_interactions.utils.database.bound_list import BoundList
