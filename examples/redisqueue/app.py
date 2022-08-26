@@ -7,7 +7,7 @@ from rq import Queue
 
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import DiscordInteractions, Message
+from deta_discord_interactions import DiscordInteractions, Message
 
 from tasks import do_screenshot
 

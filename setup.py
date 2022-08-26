@@ -6,19 +6,19 @@ with open("README.md") as file:
 
 
 setup(
-    name="Flask-Discord-Interactions",
-    version="2.0.0",
-    url="https://github.com/Breq16/flask-discord-interactions",
-    author="Brooke Chalmers",
-    author_email="breq@breq.dev",
-    description="A Flask extension for Discord slash commands.",
+    name="Deta-Discord-Interactions",
+    version="0.0.1",
+    url="https://github.com/etrotta/flask-discord-interactions",
+    author="etrotta",
+    author_email="etrotta@duck.com",
+    description="A web framework for Discord interactions specialized for deta.",
     long_description=readme,
     long_description_content_type="text/markdown",
     packages=find_packages(),
     zip_safe=False,
     include_package_data=True,
     platforms="any",
-    install_requires=["requests", "PyNaCl", "requests-toolbelt"],
+    install_requires=["requests", "PyNaCl", "requests-toolbelt", "deta"],
     tests_require=["pytest"],
     classifiers=[
         "Environment :: Web Environment",
@@ -27,5 +27,5 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Programming Language :: Python",
     ],
-    python_requires=">=3.7",
+    python_requires=">=3.9",
 )

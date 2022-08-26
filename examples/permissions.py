@@ -5,7 +5,7 @@ from flask import Flask
 
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import DiscordInteractions, Permission, Member
+from deta_discord_interactions import DiscordInteractions, Permission, Member
 
 
 app = Flask(__name__)

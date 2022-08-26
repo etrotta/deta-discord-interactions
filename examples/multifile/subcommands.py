@@ -1,6 +1,6 @@
 import threading
 
-from flask_discord_interactions import DiscordInteractionsBlueprint, Message
+from deta_discord_interactions import DiscordInteractionsBlueprint, Message
 
 
 bp = DiscordInteractionsBlueprint()

@@ -5,7 +5,7 @@ from flask import Flask
 
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import DiscordInteractions, Autocomplete
+from deta_discord_interactions import DiscordInteractions, Autocomplete
 
 
 app = Flask(__name__)

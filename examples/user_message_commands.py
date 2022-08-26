@@ -5,8 +5,8 @@ from flask import Flask
 
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import DiscordInteractions
-from flask_discord_interactions.context import ApplicationCommandType
+from deta_discord_interactions import DiscordInteractions
+from deta_discord_interactions.context import ApplicationCommandType
 
 
 app = Flask(__name__)

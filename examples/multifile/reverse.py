@@ -1,4 +1,4 @@
-from flask_discord_interactions import DiscordInteractionsBlueprint
+from deta_discord_interactions import DiscordInteractionsBlueprint
 
 
 bp = DiscordInteractionsBlueprint()

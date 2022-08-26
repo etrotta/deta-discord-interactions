@@ -1,5 +1,5 @@
 import requests
-from flask_discord_interactions import Message
+from deta_discord_interactions import Message
 
 
 def do_screenshot(ctx, url):

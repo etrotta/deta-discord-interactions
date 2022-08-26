@@ -8,7 +8,7 @@ from flask import Flask
 # (you don't actually need it in your code)
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import DiscordInteractions  # noqa: E402
+from deta_discord_interactions import DiscordInteractions  # noqa: E402
 
 
 app = Flask(__name__)

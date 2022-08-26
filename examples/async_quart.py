@@ -10,7 +10,7 @@ from quart import Quart
 sys.path.insert(1, ".")
 
 import quart.flask_patch
-from flask_discord_interactions import DiscordInteractions, Message
+from deta_discord_interactions import DiscordInteractions, Message
 
 
 app = Quart(__name__)

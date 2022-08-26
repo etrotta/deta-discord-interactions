@@ -8,7 +8,7 @@ from flask import Flask
 # (you don't actually need it in your code)
 sys.path.insert(1, ".")
 
-from flask_discord_interactions import (
+from deta_discord_interactions import (
     DiscordInteractions,
     Message,
     Modal,

@@ -5,7 +5,7 @@ from rq import Worker
 
 sys.path.insert(1, ".")
 
-import flask_discord_interactions
+import deta_discord_interactions
 
 worker = Worker(["default"], connection=Redis())
 worker.work()
