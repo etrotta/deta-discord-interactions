@@ -56,7 +56,7 @@ class Database:
         self.__base.put(data, key)
         return Record(key, self, data)
     
-    def put_many(self, data: list[dict]) -> Record:
+    def put_many(self, data: list[dict]) -> list[Record]:
         "Insert or update multiple records and return them."
         if not HAS_BASE:
             raise AssertionError("Cannot access the Database without deta installed")
@@ -67,7 +67,7 @@ class Database:
 
     def fetch(
         self,
-        query: Union[Query, dict, list[dict]],
+        query: Union[Query, dict, list[dict], None] = None,
         limit: int = 1000,
         last: Optional[str] = None,
     ) -> list[Record]:
