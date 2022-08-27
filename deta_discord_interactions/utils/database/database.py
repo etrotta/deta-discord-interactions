@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Optional, Union
 import typing
+import os
 from deta_discord_interactions.utils.database.exceptions import KeyNotFound
 from deta_discord_interactions.utils.database.record import Record
 from deta_discord_interactions.utils.database.adapters import transform_identifier
@@ -18,6 +19,9 @@ except ImportError:
     # warnings.warn("Failed to import deta. Any database operations will fail.")
     HAS_BASE = False
 
+if os.getenv("DO_NOT_SYNC_DETA_BASE"):
+    HAS_BASE = True
+    from deta_discord_interactions.utils.database._local_base import Base
 
 EMPTY_DICTIONARY_STRING = "$EMPTY_DICT$"  # Setting a field to an empty dictionaries seems to set it to `null`
 
