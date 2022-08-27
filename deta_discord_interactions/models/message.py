@@ -1,16 +1,17 @@
 import dataclasses
-from deta_discord_interactions.models.user import Member
-import inspect
-from typing import List, Union
 import json
+from typing import List, Union
 from datetime import datetime
+
 import requests_toolbelt
+
+from deta_discord_interactions.enums import ResponseType
 
 from deta_discord_interactions.models.utils import LoadableDataclass
 from deta_discord_interactions.models.component import Component
 from deta_discord_interactions.models.embed import Embed
-
-from deta_discord_interactions.enums import ResponseType
+from deta_discord_interactions.models.user import Member
+from deta_discord_interactions.models.interaction import MessageInteraction
 
 
 @dataclasses.dataclass
@@ -58,6 +59,8 @@ class Message(LoadableDataclass):
     components
         An array of :class:`.Component` objects representing message
         components.
+    interaction
+        Partial data of the interaction that this message is a reply to.
     """
 
     content: str = None
@@ -80,6 +83,7 @@ class Message(LoadableDataclass):
     timestamp: datetime = None
     edited_timestamp: datetime = None
     author: Member = None
+    interaction: MessageInteraction = None
 
     def __post_init__(self):
         if self.embed is not None and self.embeds is not None:
@@ -119,6 +123,9 @@ class Message(LoadableDataclass):
 
         if isinstance(self.author, dict):
             self.author = Member.from_dict(self.author)
+
+        if isinstance(self.interaction, dict):
+            self.interaction = Member.from_dict(self.interaction)
 
     @property
     def flags(self):
