@@ -1,4 +1,3 @@
-import warnings
 from flask_discord_interactions.command import (
     Command,
     SlashCommandSubgroup,
@@ -32,6 +31,7 @@ from flask_discord_interactions.models import (
     Autocomplete,
     AutocompleteResult,
     Option,
+    MessageInteraction,
 )
 
 from flask_discord_interactions.discord import (
@@ -60,6 +60,7 @@ __all__ = [
     "User",
     "Role",
     "Channel",
+    "Attachment",
     "InteractionType",
     "DiscordInteractions",
     "DiscordInteractionsBlueprint",
@@ -81,4 +82,5 @@ __all__ = [
     "Autocomplete",
     "AutocompleteResult",
     "Option",
+    "MessageInteraction",
 ]

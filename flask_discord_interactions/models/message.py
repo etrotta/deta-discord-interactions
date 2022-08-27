@@ -9,6 +9,7 @@ import requests_toolbelt
 from flask_discord_interactions.models.utils import LoadableDataclass
 from flask_discord_interactions.models.component import Component
 from flask_discord_interactions.models.embed import Embed
+from flask_discord_interactions.models.interaction import MessageInteraction
 
 from flask_discord_interactions.enums import ResponseType
 
@@ -80,6 +81,7 @@ class Message(LoadableDataclass):
     timestamp: datetime = None
     edited_timestamp: datetime = None
     author: Member = None
+    interaction: MessageInteraction = None
 
     def __post_init__(self):
         if self.embed is not None and self.embeds is not None:
@@ -119,6 +121,9 @@ class Message(LoadableDataclass):
 
         if isinstance(self.author, dict):
             self.author = Member.from_dict(self.author)
+
+        if isinstance(self.interaction, dict):
+            self.interaction = MessageInteraction.from_dict(self.interaction)
 
     @property
     def flags(self):
