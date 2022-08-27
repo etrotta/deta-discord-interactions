@@ -59,8 +59,6 @@ class Message(LoadableDataclass):
     components
         An array of :class:`.Component` objects representing message
         components.
-    interaction
-        Partial data of the interaction that this message is a reply to.
     """
 
     content: str = None
@@ -125,7 +123,7 @@ class Message(LoadableDataclass):
             self.author = Member.from_dict(self.author)
 
         if isinstance(self.interaction, dict):
-            self.interaction = Member.from_dict(self.interaction)
+            self.interaction = MessageInteraction.from_dict(self.interaction)
 
     @property
     def flags(self):
