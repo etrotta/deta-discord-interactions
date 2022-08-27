@@ -24,6 +24,7 @@ from deta_discord_interactions.models.autocomplete import (
     AutocompleteResult,
 )
 from deta_discord_interactions.models.option import Option, CommandOptionType
+from deta_discord_interactions.models.interaction import MessageInteraction
 
 __all__ = [
     "Channel",
@@ -52,4 +53,5 @@ __all__ = [
     "AutocompleteResult",
     "Option",
     "Attachment",
+    "MessageInteraction",
 ]
