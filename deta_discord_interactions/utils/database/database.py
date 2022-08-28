@@ -23,7 +23,10 @@ if os.getenv("DO_NOT_SYNC_DETA_BASE"):
     HAS_BASE = True
     from deta_discord_interactions.utils.database._local_base import Base
 
-EMPTY_DICTIONARY_STRING = "$EMPTY_DICT$"  # Setting a field to an empty dictionaries seems to set it to `null`
+# Instructions for encoding / decoding data not supported by deta base
+EMPTY_DICTIONARY_STRING = "$EMPTY_DICT"  # Setting a field to an empty dictionaries seems to set it to `null`
+DATETIME_STRING = "$ENCODED_DATETIME"  # Ease datetime conversion
+ESCAPE_STRING = "$NOOP"  # Do not mess up if the user input 'just happen' to start with a $COMMAND
 
 
 class Database:
@@ -52,12 +55,14 @@ class Database:
         else:
             it = enumerate(record)
         for key, value in it:
-            if value == {}:  # Empty dict becomes `null` on deta base
-                record[key] = EMPTY_DICTIONARY_STRING
-            elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
+            if isinstance(value, (list, dict)):  # Make sure we hit nested fields
                 record[key] = self.encode_entry(value)
+            elif value == {}:  # Empty dict becomes `null` on deta base
+                record[key] = EMPTY_DICTIONARY_STRING
+            elif isinstance(value, str) and value.startswith("$"):  # essentially escape '$'
+                record[key] = ESCAPE_STRING + value
             elif isinstance(value, datetime):  # Ease datetime conversion
-                record[key] = datetime.toisoformat()
+                record[key] = DATETIME_STRING + datetime.toisoformat()
         return record
 
     @typing.overload
@@ -71,15 +76,15 @@ class Database:
         else:
             it = enumerate(record)
         for key, value in it:
-            if value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
-                record[key] = {}
-            elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
+            if isinstance(value, (list, dict)):  # Make sure we hit nested fields
                 record[key] = self.decode_entry(value)
             elif isinstance(value, str):  # Ease datetime conversion
-                try:
-                    record[key] = datetime.fromisoformat(value)
-                except ValueError:
-                    pass
+                if value.startswith(ESCAPE_STRING):
+                    record[key] = value.removeprefix(ESCAPE_STRING)
+                elif value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
+                    record[key] = {}
+                elif value.startswith(DATETIME_STRING):
+                    record[key] = datetime.fromisoformat(value.removeprefix(DATETIME_STRING))
         return record
 
 

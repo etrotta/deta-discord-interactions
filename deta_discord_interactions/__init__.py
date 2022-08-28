@@ -31,6 +31,7 @@ from deta_discord_interactions.models import (
     Autocomplete,
     AutocompleteResult,
     Option,
+    Choice,
     MessageInteraction,
 )
 
@@ -81,5 +82,6 @@ __all__ = [
     "Autocomplete",
     "AutocompleteResult",
     "Option",
+    "Choice",
     "MessageInteraction",
 ]
