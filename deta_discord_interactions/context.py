@@ -268,6 +268,14 @@ class Context(LoadableDataclass):
         elif self.command_type == ApplicationCommandType.MESSAGE:
             return [self.target], {}
 
+    def create_autocomplete_args(self):
+        """
+        Create the arguments which will be passed to the function when the
+        :class:`Command` autocomplete handler is invoked.
+        """
+        if self.command_type == ApplicationCommandType.CHAT_INPUT:
+            return self.create_autocomplete_args_chat_input()
+
     def create_args_chat_input(self):
         """
         Create the arguments for this command, assuming it is a ``CHAT_INPUT``
@@ -327,6 +335,65 @@ class Context(LoadableDataclass):
 
         return create_args_recursive({"options": self.options}, self.resolved)
 
+    def create_autocomplete_args_chat_input(self):
+        """
+        Create the arguments for this command's autocomplete handler,
+        assuming it is a ``CHAT_INPUT`` command.
+        """
+
+        def create_args_recursive(data, resolved):
+            if not data.get("options"):
+                return [], {}
+
+            args = []
+            kwargs = {}
+
+            for option in data["options"]:
+                if option["type"] in [
+                    CommandOptionType.SUB_COMMAND,
+                    CommandOptionType.SUB_COMMAND_GROUP,
+                ]:
+
+                    args.append(option["name"])
+
+                    sub_args, sub_kwargs = create_args_recursive(option, resolved)
+
+                    args += sub_args
+                    kwargs.update(sub_kwargs)
+
+                elif option["type"] == CommandOptionType.USER:
+                    if "members" in resolved:
+                        member_data = resolved["members"][option["value"]]
+                        member_data["user"] = resolved["users"][option["value"]]
+
+                        kwargs[option["name"]] = Option.from_data(option, value=Member.from_dict(member_data))
+                    else:
+                        kwargs[option["name"]] = Option.from_data(option, value=User.from_dict(
+                            resolved["users"][option["value"]]
+                        ))
+
+                elif option["type"] == CommandOptionType.CHANNEL:
+                    kwargs[option["name"]] = Option.from_data(option, value=Channel.from_dict(
+                        resolved["channels"][option["value"]]
+                    ))
+
+                elif option["type"] == CommandOptionType.ROLE:
+                    kwargs[option["name"]] = Option.from_data(option, value=Role.from_dict(
+                        resolved["roles"][option["value"]]
+                    ))
+
+                elif option["type"] == CommandOptionType.ATTACHMENT:
+                    kwargs[option["name"]] = Option.from_data(option, value=Attachment.from_dict(
+                        resolved["attachments"][option["value"]]
+                    ))
+
+                else:
+                    kwargs[option["name"]] = Option.from_data(option)
+
+            return args, kwargs
+
+        return create_args_recursive({"options": self.options}, self.resolved)
+
     def create_handler_args(self, handler: Callable):
         """
         Create the arguments which will be passed to the function when a
@@ -365,9 +432,6 @@ class Context(LoadableDataclass):
                     )
 
         return args
-
-    def create_autocomplete_args(self):
-        return [Option.from_data(option) for option in self.options]
 
     def followup_url(self, message: str = None):
         """

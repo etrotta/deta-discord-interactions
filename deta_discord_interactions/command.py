@@ -19,6 +19,7 @@ from deta_discord_interactions.models import (
     Option,
     Attachment,
 )
+from deta_discord_interactions.models.autocomplete import AutocompleteResult
 
 if TYPE_CHECKING:
     from deta_discord_interactions.discord import DiscordInteractions
@@ -83,6 +84,7 @@ class Command:
         name_localizations: Dict[str, str] = None,
         description_localizations: Dict[str, str] = None,
         discord: "DiscordInteractions" = None,
+        autocomplete_handler: Callable = None,
     ):
         self.command = command
         self.name = name
@@ -95,6 +97,7 @@ class Command:
         self.name_localizations = name_localizations
         self.description_localizations = description_localizations
         self.discord = discord
+        self.autocomplete_handler = autocomplete_handler
         self.id = None
 
         if self.name is None:
@@ -250,6 +253,52 @@ class Command:
 
         return self.command(context, *args, **kwargs)
 
+    def make_context_and_run_autocomplete(
+        self, *, discord: "DiscordInteractions", data: dict
+    ):
+        """
+        Creates the :class:`Context` object for an invocation of this
+        command, then invokes it's autocomplete handler.
+
+        Parameters
+        ----------
+        discord: DiscordInteractions
+            The :class:`DiscordInteractions` object used to receive this
+            interaction.
+        data: dict
+            The incoming interaction data.
+
+        Returns
+        -------
+        AutocompleteResult
+            The response by the handler, converted to an AutocompleteResult object.
+        """
+
+        context = Context.from_data(discord, data)
+        args, kwargs = context.create_autocomplete_args()
+
+        result = self.run_autocomplete(context, *args, **kwargs)
+
+        return AutocompleteResult.from_return_value(result)
+
+    def run_autocomplete(self, context: Context, *args, **kwargs):
+        """
+        Invokes the function defining this command's autocomplete.
+
+        Parameters
+        ----------
+        context: Context
+            The :class:`Context` object representing the current state.
+        *args
+            Any subcommands of the current command being called.
+        **kwargs
+            Any other options in the current invocation.
+        """
+        if self.autocomplete_handler is None:
+            raise ValueError("This command does not have an autocomplete handler registered")
+
+        return self.autocomplete_handler(context, *args, **kwargs)
+
     def dump(self):
         "Returns this command as a dict for registration with the Discord API."
         data = {
@@ -287,8 +336,9 @@ class Command:
 
         """
 
-        def wrapper(f):
-            self.discord.add_autocomplete_handler(f, self.name)
+        def wrapper(function: Callable) -> Callable:
+            self.autocomplete_handler = function
+            return function
 
         return wrapper
 
@@ -358,7 +408,7 @@ class SlashCommandSubgroup(Command):
             options defined in the function's keyword arguments.
         """
 
-        def decorator(func):
+        def decorator(func: Callable) -> Command:
             subcommand = Command(
                 func,
                 name,
@@ -369,7 +419,7 @@ class SlashCommandSubgroup(Command):
                 annotations=annotations,
             )
             self.subcommands[subcommand.name] = subcommand
-            return func
+            return subcommand
 
         return decorator
 
@@ -409,6 +459,21 @@ class SlashCommandSubgroup(Command):
             Any other options in the current invocation.
         """
         return self.subcommands[subcommands[0]].run(context, *subcommands[1:], **kwargs)
+
+    def run_autocomplete(self, context, *subcommands, **kwargs):
+        """
+        Invokes the relevant subcommand's autocomplete handler for the given :class:`Context`.
+
+        Parameters
+        ----------
+        context: Context
+            The :class:`Context` object representing the current state.
+        *args
+            List of subcommands of the current command group being invoked.
+        **kwargs
+            Any other options in the current invocation.
+        """
+        return self.subcommands[subcommands[0]].run_autocomplete(context, *subcommands[1:], **kwargs)
 
 
 class SlashCommandGroup(SlashCommandSubgroup):

@@ -43,7 +43,6 @@ class DiscordInteractionsBlueprint:
     def __init__(self):
         self.discord_commands = {}
         self.custom_id_handlers = {}
-        self.autocomplete_handlers = {}
 
     def add_command(
         self,
@@ -250,19 +249,6 @@ class DiscordInteractionsBlueprint:
             return custom_id
 
         return decorator
-
-    def add_autocomplete_handler(self, handler: Callable, command_name: str):
-        """
-        Add a handler for an incoming autocomplete request.
-
-        Parameters
-        ----------
-        handler: Callable
-            The function to call to handle the incoming autocomplete request.
-        command_name: str
-            The name of the command to autocomplete.
-        """
-        self.autocomplete_handlers[command_name] = handler
 
 
 class DiscordInteractions(DiscordInteractionsBlueprint):
@@ -501,7 +487,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         """
         self.discord_commands.update(blueprint.discord_commands)
         self.custom_id_handlers.update(blueprint.custom_id_handlers)
-        self.autocomplete_handlers.update(blueprint.autocomplete_handlers)
 
     def run_command(self, data: dict):
         """
@@ -559,8 +544,8 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
     def run_autocomplete(self, data: dict):
         """
-        Run the corresponding autocomplete handler given incoming interaction
-        data.
+        Run the corresponding command's autocomplete handler given incoming 
+        interaction data.
 
         Parameters
         ----------
@@ -573,12 +558,12 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             The result of the autocomplete handler.
         """
 
-        context = Context.from_data(self, data)
-        handler = self.autocomplete_handlers[context.command_name]
-        args = context.create_autocomplete_args()
-        result = handler(context, *args)
+        command_name = data["data"]["name"]
 
-        return AutocompleteResult.from_return_value(result)
+        command = self.discord_commands[command_name]
+
+        return command.make_context_and_run_autocomplete(discord=self, data=data)
+
 
     def verify_signature(self, request):
         """

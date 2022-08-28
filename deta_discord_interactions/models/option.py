@@ -3,6 +3,8 @@ from typing import Any, Optional, Union
 
 from deta_discord_interactions.models import User, Member, Channel, Role
 
+_NO_DEFAULT = object()  # Sentinel for an Option's value
+
 
 class CommandOptionType:
     "Represents the different option type integers."
@@ -105,14 +107,14 @@ class Option:
                 raise ValueError(f"Unknown type {self.type}")
 
     @classmethod
-    def from_data(cls, data: dict):
+    def from_data(cls, data: dict, value: Any = _NO_DEFAULT):
         """
         Load this option from incoming Interaction data.
         """
         return cls(
             name=data["name"],
             type=data["type"],
-            value=data.get("value"),
+            value=data.get("value") if value is _NO_DEFAULT else value,
             focused=data.get("focused"),
         )
 

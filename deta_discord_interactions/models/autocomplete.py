@@ -82,3 +82,11 @@ class AutocompleteResult:
             return AutocompleteResult(
                 [{"name": str(choice), "value": choice} for choice in value]
             )
+
+    def __str__(self):
+        children = ", ".join(str(choice) for choice in self.choices)
+        return f"AutocompleteResult(choices=[{children}])"
+
+    def __repr__(self):
+        children = ", ".join(repr(choice) for choice in self.choices)
+        return f"AutocompleteResult(choices=[{children}])"
