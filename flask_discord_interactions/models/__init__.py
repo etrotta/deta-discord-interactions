@@ -24,7 +24,7 @@ from flask_discord_interactions.models.autocomplete import (
     AutocompleteResult,
 )
 from flask_discord_interactions.models.interaction import MessageInteraction
-from flask_discord_interactions.models.option import Option, CommandOptionType
+from flask_discord_interactions.models.option import Option, CommandOptionType, Choice
 
 __all__ = [
     "Channel",
@@ -52,6 +52,7 @@ __all__ = [
     "Autocomplete",
     "AutocompleteResult",
     "Option",
+    "Choice",
     "Attachment",
     "MessageInteraction",
 ]
