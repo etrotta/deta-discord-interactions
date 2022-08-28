@@ -361,32 +361,6 @@ class Context(LoadableDataclass):
                     args += sub_args
                     kwargs.update(sub_kwargs)
 
-                elif option["type"] == CommandOptionType.USER:
-                    if "members" in resolved:
-                        member_data = resolved["members"][option["value"]]
-                        member_data["user"] = resolved["users"][option["value"]]
-
-                        kwargs[option["name"]] = Option.from_data(option, value=Member.from_dict(member_data))
-                    else:
-                        kwargs[option["name"]] = Option.from_data(option, value=User.from_dict(
-                            resolved["users"][option["value"]]
-                        ))
-
-                elif option["type"] == CommandOptionType.CHANNEL:
-                    kwargs[option["name"]] = Option.from_data(option, value=Channel.from_dict(
-                        resolved["channels"][option["value"]]
-                    ))
-
-                elif option["type"] == CommandOptionType.ROLE:
-                    kwargs[option["name"]] = Option.from_data(option, value=Role.from_dict(
-                        resolved["roles"][option["value"]]
-                    ))
-
-                elif option["type"] == CommandOptionType.ATTACHMENT:
-                    kwargs[option["name"]] = Option.from_data(option, value=Attachment.from_dict(
-                        resolved["attachments"][option["value"]]
-                    ))
-
                 else:
                     kwargs[option["name"]] = Option.from_data(option)
 
