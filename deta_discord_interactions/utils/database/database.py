@@ -55,10 +55,10 @@ class Database:
         else:
             it = enumerate(record)
         for key, value in it:
-            if isinstance(value, (list, dict)):  # Make sure we hit nested fields
-                record[key] = self.encode_entry(value)
-            elif value == {}:  # Empty dict becomes `null` on deta base
+            if isinstance(value, dict) and dict(value) == {}:  # Empty dict becomes `null` on deta base
                 record[key] = EMPTY_DICTIONARY_STRING
+            elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
+                record[key] = self.encode_entry(value)
             elif isinstance(value, str) and value.startswith("$"):  # essentially escape '$'
                 record[key] = ESCAPE_STRING + value
             elif isinstance(value, datetime):  # Ease datetime conversion
