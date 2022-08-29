@@ -362,7 +362,7 @@ class Context(LoadableDataclass):
                     kwargs.update(sub_kwargs)
 
                 else:
-                    kwargs[option["name"]] = Option.from_data(option)
+                    kwargs[option["name"]] = Option.from_dict(option)
 
             return args, kwargs
 

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 
-from deta_discord_interactions.models import User, Member, Channel, Role
-
-_NO_DEFAULT = object()  # Sentinel for an Option's value
+from deta_discord_interactions.models.utils import LoadableDataclass
+from deta_discord_interactions.models.user import User, Member
+from deta_discord_interactions.models.channel import Channel
+from deta_discord_interactions.models.role import Role
 
 
 class CommandOptionType:
@@ -22,7 +23,7 @@ class CommandOptionType:
 
 
 @dataclass
-class Option:
+class Option(LoadableDataclass):
     """
     Represents an option provided to a slash command.
 
@@ -106,17 +107,6 @@ class Option:
             else:
                 raise ValueError(f"Unknown type {self.type}")
 
-    @classmethod
-    def from_data(cls, data: dict, value: Any = _NO_DEFAULT):
-        """
-        Load this option from incoming Interaction data.
-        """
-        return cls(
-            name=data["name"],
-            type=data["type"],
-            value=data.get("value") if value is _NO_DEFAULT else value,
-            focused=data.get("focused"),
-        )
 
     def dump(self):
         """

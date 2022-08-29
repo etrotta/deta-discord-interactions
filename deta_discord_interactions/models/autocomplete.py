@@ -1,10 +1,16 @@
 import json
 from typing import Union
+from dataclasses import dataclass
+
 from deta_discord_interactions.models.message import ResponseType
 from deta_discord_interactions.models.option import Choice
 
+class _MetaAutocomplete(type):
+    def __getitem__(self, t: type):
+        return self(t)
 
-class Autocomplete:
+
+class Autocomplete(metaclass=_MetaAutocomplete):
     """
     Represents the type of an option that can be autocompleted.
 
@@ -16,8 +22,13 @@ class Autocomplete:
 
     def __init__(self, t: type):
         self.t = t
+    
+    # "Using __class_getitem__() on any class for purposes other than type hinting is discouraged."
+    # def __class_get_item__(cls, t: type) -> 'Autocomplete':
+    #     return cls(t)
 
 
+@dataclass
 class AutocompleteResult:
     """
     Represents the result of an autocomplete handler.
@@ -25,12 +36,9 @@ class AutocompleteResult:
     Parameters
     ----------
     choices
-        A dict mapping the displayed name of each choice to its value passed to
-        your command.
+        A list of dicts representing the choices to be presented to the user.
     """
-
-    def __init__(self, choices=[]):
-        self.choices = choices
+    choices: list[dict]
 
     def encode(self):
         """
@@ -50,8 +58,8 @@ class AutocompleteResult:
 
         return json.dumps(data), "application/json"
 
-    @staticmethod
-    def from_return_value(value: Union[dict, list, "AutocompleteResult"]):
+    @classmethod
+    def from_return_value(cls, value: Union[dict, list, "AutocompleteResult"]):
         """
         Converts the return value of an autocomplete handler to an
         AutocompleteResult.
@@ -69,24 +77,16 @@ class AutocompleteResult:
         if isinstance(value, AutocompleteResult):
             return value
         elif isinstance(value, dict):
-            return AutocompleteResult([value])
+            return cls([value])
         elif isinstance(value, list) and all(
             isinstance(choice, dict) for choice in value
         ):
-            return AutocompleteResult(value)
+            return cls(value)
         elif isinstance(value, list) and all(
             isinstance(choice, Choice) for choice in value
         ):
-            return AutocompleteResult([choice.dump() for choice in value])
+            return cls([choice.dump() for choice in value])
         elif isinstance(value, list):
-            return AutocompleteResult(
+            return cls(
                 [{"name": str(choice), "value": choice} for choice in value]
             )
-
-    def __str__(self):
-        children = ", ".join(str(choice) for choice in self.choices)
-        return f"AutocompleteResult(choices=[{children}])"
-
-    def __repr__(self):
-        children = ", ".join(repr(choice) for choice in self.choices)
-        return f"AutocompleteResult(choices=[{children}])"

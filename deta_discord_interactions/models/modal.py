@@ -31,17 +31,17 @@ class Modal(LoadableDataclass):
     def __post_init__(self):
         # Verify Custom ID
         if self.custom_id is None:
-            raise ValueError("Modals require custom_id")
+            raise ValueError("Modals require a custom_id")
 
         if isinstance(self.custom_id, list) or isinstance(self.custom_id, tuple):
             self.custom_id = "\n".join(str(item) for item in self.custom_id)
 
         if len(self.custom_id) > 100:
-            raise ValueError("custom_id has maximum 100 characters")
+            raise ValueError("custom_id has a maximum of 100 characters")
 
         # Verify Title
         if self.title is None:
-            raise ValueError("Modals require title")
+            raise ValueError("Modals require a title")
 
         # Verify Components
         if not (
