@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import typing
-from typing import Any
+from deta.base import Util
+from deta_discord_interactions.utils.database.bound_meta import BoundMeta
 if typing.TYPE_CHECKING:
     from deta_discord_interactions.utils.database.record import Record
-from functools import wraps
 
 
-class BoundList(list):
+bind_methods = [
+    '__add__', '__delitem__', '__iadd__', '__imul__', '__setitem__',
+    # 'append',
+    'clear', 'extend', 'insert', 'pop', 'remove', 'reverse', 'sort',
+]
+
+class BoundList(list, metaclass=BoundMeta, bind_methods=bind_methods):
     """List which updates the database when modified.
     If you wish to make changes without affecting the database, use list.copy()
-    Most Magic methods are not supported yet. 
-    Avoid using `del list[i]`, `list += something` etc for now.
     """
-    _BOUND_LIST_METHODS = ('pop', 'clear', 'extend', 'remove', 'reverse', 'sort')
     def __init__(self, bound_key: str, bound_record: 'Record', *argument):
+        super().__init__(*argument)
         self._bound_key = bound_key
         self._bound_record = bound_record
-        super().__init__(*argument)
 
     def append(self, item):
         super().append(item)
@@ -28,9 +31,23 @@ class BoundList(list):
         else:
             self._bound_record._database.update(
                 self._bound_record.key,
-                {"$append": {self._bound_key: item}}
+                {self._bound_key: Util.Append(item)}
             )
-    
+
+    def _sync(self, method, value, *args, **kwargs):
+        if method.startswith("__i") and isinstance(value, BoundList):
+            self = value
+        if self._bound_record._preparing_statement:
+            self._bound_record._prepared_statement[
+                self._bound_key
+            ] = list(self)
+        else:
+            self._bound_record._database.update(
+                self._bound_record.key,
+                {self._bound_key: list(self)}
+            )
+        return value
+
     # def __getitem__(self, index):
     #     result = super().__getitem__(index)
     #     if not isinstance(index, int):
@@ -49,23 +66,3 @@ class BoundList(list):
     #             result,
     #         )
     #     return result
-
-    def __getattribute__(self, __name: str) -> Any:
-        if __name in self._BOUND_LIST_METHODS:
-            function = super().__getattribute__(__name)
-            @wraps(function)
-            def wrapped(*args, **kwargs):
-                result = function(*args, **kwargs)
-                if self._bound_record._preparing_statement:
-                    self._bound_record._prepared_statement[
-                        self._bound_key
-                    ] = list(self)
-                else:
-                    self._bound_record._database.update(
-                        self._bound_record.key,
-                        {self._bound_key: list(self)}
-                    )
-                return result
-            return wrapped
-        else:
-            return super().__getattribute__(__name)
