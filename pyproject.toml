@@ -10,7 +10,7 @@ authors = [
 ]
 description = "A web framework for Discord interactions specialized for usage in https://deta.sh"
 readme = "README.md"
-license = { file="LICENSE" }
+license = { text = "MIT" }
 requires-python = ">=3.9"
 classifiers = [
     "Programming Language :: Python :: 3",
