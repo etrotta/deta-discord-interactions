@@ -2,6 +2,8 @@ import functools
 from typing import Callable
 from deta.base import Util
 
+# In the future: Perhaps get rid of this and use pytest fixtures instead?
+
 operations = {
     "ne": lambda key, value, record: record.get(key) != value,
 
@@ -40,10 +42,11 @@ def parse_filters(filters: list[dict]) -> Callable:
     return match_record
 
 
+_shared_inventory = {}
 class Base:
     def __init__(self, name):
         self.name = name
-        self.inventory = {}
+        self.inventory = _shared_inventory.setdefault(name, {})
 
     def get(self, key):
         return self.inventory.get(key)

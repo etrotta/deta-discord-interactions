@@ -6,6 +6,7 @@ from deta_discord_interactions.models import (
 )
 from deta_discord_interactions.command import Command
 
+
 def transform_identifier(obj: Any, on_unknown: Literal['raise', 'ignore'] = 'raise') -> str:
     """Transforms a identifier based on a set of rules.
     If it is not recognized, `unknown` defines whenever to `raise` or `ignore`

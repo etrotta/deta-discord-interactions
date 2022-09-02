@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import os
 import typing
+import importlib
 from typing import Optional, Union
 from datetime import datetime
+import inspect
 
 from deta_discord_interactions.utils.database.exceptions import KeyNotFound
 from deta_discord_interactions.utils.database.record import Record
 from deta_discord_interactions.utils.database.adapters import transform_identifier
 from deta_discord_interactions.utils.database.query import Query
+
+from deta_discord_interactions.models.utils import LoadableDataclass
 
 from deta import Base
 
@@ -46,12 +50,22 @@ class Database:
         for key, value in it:
             if isinstance(value, dict) and dict(value) == {}:  # Empty dict becomes `null` on deta base
                 record[key] = EMPTY_DICTIONARY_STRING
+            elif isinstance(value, LoadableDataclass):  # Convert our dataclasses
+                record[key] = value.to_dict()
+            elif inspect.isfunction(value):  # Converts functions to references based on their source file and name
+                # This should only be used if this record is only going to be stored for a short amount of time
+                # And even then, it should be using sparingly
+                record[key] = {
+                    "__database_load_method": False,
+                    "__module": value.__module__,
+                    "__name": value.__name__,
+                }
             elif isinstance(value, (list, dict)):  # Make sure we hit nested fields
                 record[key] = self.encode_entry(value)
             elif isinstance(value, str) and value.startswith("$"):  # essentially escape '$'
                 record[key] = ESCAPE_STRING + value
             elif isinstance(value, datetime):  # Ease datetime conversion
-                record[key] = DATETIME_STRING + datetime.toisoformat()
+                record[key] = DATETIME_STRING + value.isoformat()
         return record
 
     @typing.overload
@@ -67,13 +81,24 @@ class Database:
         for key, value in it:
             if isinstance(value, (list, dict)):  # Make sure we hit nested fields
                 record[key] = self.decode_entry(value)
-            elif isinstance(value, str):  # Ease datetime conversion
-                if value.startswith(ESCAPE_STRING):
-                    record[key] = value.removeprefix(ESCAPE_STRING)
-                elif value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
+                try:  # Try to convert into a python object. Ignore if it isns't one or if it fails to load
+                    method = value['__database_load_method']
+                    module = value['__module']
+                    name = value['__name']
+                    py_obj = getattr(importlib.import_module(module), name)
+                    if method:
+                        record[key] = getattr(py_obj, method)(record[key])
+                    else:
+                        record[key] = py_obj
+                except Exception:
+                    pass
+            elif isinstance(value, str):
+                if value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
                     record[key] = {}
-                elif value.startswith(DATETIME_STRING):
+                elif value.startswith(DATETIME_STRING):  # Ease datetime conversion
                     record[key] = datetime.fromisoformat(value.removeprefix(DATETIME_STRING))
+                elif value.startswith(ESCAPE_STRING):  # Escape strings starting with `$`
+                    record[key] = value.removeprefix(ESCAPE_STRING)
         return record
 
 
