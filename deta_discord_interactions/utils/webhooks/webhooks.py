@@ -91,7 +91,7 @@ def create_webhook(
     with pending_webhooks[internal_id] as record:
         record["pending_webhook"] = promise
         record["redirect_uri"] = redirect_uri
-        record["__expires_in"] = 600
+        # record["__expires_in"] = 600
 
     link = (
         f"{DISCORD_BASE_URL}/oauth2/authorize?"

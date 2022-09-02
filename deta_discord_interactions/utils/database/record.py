@@ -33,11 +33,12 @@ class Record:
             import warnings
             warnings.warn("Aborting prepared operation since an Exception was raised.")
         else:
-            try:
-                self._database.update(self.key, self._prepared_statement)
-            except KeyNotFound:
-                self._database.put(self.key, {})
-                self._database.update(self.key, self._prepared_statement)
+            if self._prepared_statement:
+                try:
+                    self._database.update(self.key, self._prepared_statement)
+                except KeyNotFound:
+                    self._database.put(self.key, {})
+                    self._database.update(self.key, self._prepared_statement)
         self._prepared_statement = {}
 
     def __iter__(self):
