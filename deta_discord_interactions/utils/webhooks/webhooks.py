@@ -119,11 +119,11 @@ def _handle_oauth(
     start_response: Callable[[str, list], None],
     abort: Callable[[int, str], NoReturn],
 ) -> list[str]:
-    code = request["query_dict"].get("code")
-    state = request["query_dict"].get("state")
-    guild_id = request["query_dict"].get("guild_id")
-
-    if code is None or state is None or guild_id is None:
+    try:
+        code = request["query_dict"]["code"]
+        state = request["query_dict"]["state"]
+        # guild_id = request["query_dict"]["guild_id"]
+    except KeyError:
         abort(400, 'Invalid URL')
 
     url = DISCORD_BASE_URL + "/oauth2/token"

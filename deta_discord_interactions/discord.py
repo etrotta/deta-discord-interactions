@@ -664,8 +664,12 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             if raw_data:
                 data["json"] = json.loads(raw_data.decode("UTF-8"))
                 data["raw_data"] = raw_data
+
             data["path"] = data.get("PATH_INFO", '') or '/'
-            data["query_dict"] = dict(args.split('=', 1) for args in data["QUERY_STRING"].split("&"))
+
+            if data["QUERY_STRING"]:
+                data["query_dict"] = dict(args.split('=', 1) for args in data["QUERY_STRING"].split("&"))
+
             if data['path'] == '/discord':
                 result = self.handle_interaction(data)
                 response, mimetype = result.encode()
