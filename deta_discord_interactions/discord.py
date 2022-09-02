@@ -8,7 +8,6 @@ import requests
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
-from deta_discord_interactions.models.autocomplete import AutocompleteResult
 from deta_discord_interactions.models.option import Option
 
 from deta_discord_interactions.command import Command, SlashCommandGroup
@@ -271,6 +270,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             self.DONT_VALIDATE_SIGNATURE = os.getenv("DONT_VALIDATE_SIGNATURE", False)
         except KeyError:
             raise Exception("Please fill in the .env files with your application's credentials.")
+        self.__routes = {}
 
     def fetch_token(self):
         """
@@ -608,15 +608,15 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
                 import warnings
                 warnings.warn("The whitespace for the request data may have been modified before being sent to discord-interactions")
 
-    def handle_request(self, request):
+    def handle_interaction(self, request: dict):
         """
-        Verify the signature in the incoming request and return the Message
-        result from the given command.
+        Verify the signature in the incoming request and return the
+        result from the corresponding handler.
 
         Returns
         -------
-        Message
-            The resulting message from the command.
+        Message | Modal | AutocompleteResult
+            The response from the corresponding handler.
         """
         self.verify_signature(request)
 
@@ -636,6 +636,22 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             raise RuntimeWarning(
                 f"Interaction type {interaction_type} is not yet supported"
             )
+    
+    def route(self, route_path: str):
+        """Decorator to register a custom route.
+        Used internally for Webhooks OAuth, but for most purposes,
+        I would recommend to use another Micro with FastAPI or Flask instead.
+
+        Example usage:
+        @app.route('/')
+        def home(request, start_response, abort):
+            start_response('200 OK', [])
+            return ['Hello World!'.encode('UTF-8')]
+        """
+        def decorator(function):
+            self.__routes[route_path] = function
+            return function
+        return decorator
 
     def __call__(self, environ, start_response):
         """
@@ -643,19 +659,31 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         (WSGI)
         """
         try:
-            try:
-                data = environ.copy()
-                raw_data = environ["wsgi.input"].read()
+            data = environ.copy()
+            raw_data = environ["wsgi.input"].read()
+            if raw_data:
                 data["json"] = json.loads(raw_data.decode("UTF-8"))
                 data["raw_data"] = raw_data
-            except Exception:
-                self.abort(400, "Malformed or missing JSON body")
-            result = self.handle_request(data)
-            response, mimetype = result.encode()
-            status = "200 OK"
-            response_headers = [("Content-Type", mimetype)]
-            start_response(status, response_headers)
-            return [response.encode("UTF-8")]
+            data["path"] = data.get("PATH_INFO", '') or '/'
+            data["query_dict"] = dict(args.split('=', 1) for args in data["QUERY_STRING"].split("&"))
+            if data['path'] == '/discord':
+                result = self.handle_interaction(data)
+                response, mimetype = result.encode()
+                status = "200 OK"
+                response_headers = [("Content-Type", mimetype)]
+                start_response(status, response_headers)
+                return [response.encode("UTF-8")]
+            elif (  # If you set it like `https://example.deta.dev` instead of `https://example.deta.dev/discord`
+                data['path'] == '/' 
+                and '/' not in self.__routes 
+                and "Discord-Interactions" in data.get("HTTP_USER_AGENT")
+                and self.verify_signature(data)
+            ):
+                raise Exception("Please set the path to `.../discord` on the Developer Portal, not just the Micro URL")
+            elif data['path'] not in self.__routes:
+                self.abort(404, 'Page not found')
+            else:
+                return self.__routes[data['path']](data, start_response, self.abort)
         except AbortError as err:
             status = err.http_code
             response_headers = [("Content-Type", "application/json")]

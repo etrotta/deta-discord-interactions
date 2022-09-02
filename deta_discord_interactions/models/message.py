@@ -188,7 +188,7 @@ class Message(LoadableDataclass):
         else:
             return cls(str(result))
 
-    def encode(self, followup=False):
+    def encode(self, followup=False, **extra):
         """
         Return this ``Message`` as a string/mimetype pair for sending to Discord.
 
@@ -202,6 +202,8 @@ class Message(LoadableDataclass):
         ----------
         followup: bool
             Whether this is a followup message.
+        **extra: str
+            Extra fields to include in the payload, mainly for Webhooks
 
         Returns
         -------
@@ -218,6 +220,7 @@ class Message(LoadableDataclass):
             "allowed_mentions": self.allowed_mentions,
             "flags": self.flags,
             "components": self.dump_components(),
+            **extra,
         }
 
         if not followup:
