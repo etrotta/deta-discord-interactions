@@ -1,6 +1,7 @@
 import functools
 from typing import Callable
 from deta.base import Util
+import json
 
 # In the future: Perhaps get rid of this and use pytest fixtures instead?
 
@@ -49,47 +50,54 @@ class Base:
         self.inventory = _shared_inventory.setdefault(name, {})
 
     def get(self, key):
-        return self.inventory.get(key)
+        obj = self.inventory.get(key)
+        if obj:
+            obj = json.loads(obj)
+        return obj
 
     def insert(self, data, key):
         if key in self.inventory:
             raise Exception(f"Item with key '{key}' already exists")
-        self.inventory[key] = data
+        self.inventory[key] = json.dumps(data)
 
     def update(self, updates, key):
         if key not in self.inventory:
             raise Exception(f"Key '{key}' not found")
 
+        obj = json.loads(self.inventory[key])
+
         for attribute, value in updates.items():
             if isinstance(value, Util.Trim):
-                del self.inventory[key][attribute]
+                del obj[attribute]
             elif isinstance(value, Util.Increment):
-                self.inventory[key][attribute] += value.val
+                obj[attribute] += value.val
             elif isinstance(value, Util.Append):  # Despite the name, value.val is always a list here
-                self.inventory[key][attribute].extend(value.val)
+                obj[attribute].extend(value.val)
             elif isinstance(value, Util.Prepend):
-                # self.inventory[key][attribute].insert(0, value.val)
-                self.inventory[key][attribute] = (
-                    value.val + self.inventory[key][attribute]
+                # obj[attribute].insert(0, value.val)
+                obj[attribute] = (
+                    value.val + obj[attribute]
                 )
             else:
-                self.inventory[key][attribute] = value
+                obj[attribute] = value
+        
+        self.inventory[key] = json.dumps(obj)
 
     def put_many(self, items):
         for item in items:
-            self.inventory[item.pop('key')] = item
+            self.inventory[item.pop('key')] = json.dumps(item)
 
     def put(self, item, key):
-        self.inventory[key] = item
+        self.inventory[key] = json.dumps(item)
 
     def fetch(self, query, limit, last):
         results = []
         match_condition = parse_filters(query)
         for key, value in self.inventory.items():
-            val = value.copy()
-            val["key"] = key
-            if match_condition(val):
-                results.append(val)
+            obj = json.loads(value)
+            obj["key"] = key
+            if match_condition(obj):
+                results.append(obj)
         if isinstance(last, str):
             index = next((i for i, record in enumerate(results) if record['key'] == last), None)
             results = results[index:]

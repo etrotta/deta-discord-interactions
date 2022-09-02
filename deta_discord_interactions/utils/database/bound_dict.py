@@ -24,7 +24,7 @@ class BoundDict(dict, metaclass=BoundMeta, bind_methods=bind_methods):
     def _sync(self, method, value, *args, **kwargs):
         # 'Getter' methods
         if method in ('get', '__getitem__', 'setdefault'):
-            key = kwargs.get('key') if key in kwargs else args[0]
+            key = kwargs.get('key') if 'key' in kwargs else args[0]
             if isinstance(value, list):
                 from deta_discord_interactions.utils.database.bound_list import BoundList
                 value = BoundList(

@@ -69,7 +69,7 @@ class Webhook(LoadableDataclass):
         if avatar_url is not None:
             encode_kwargs["avatar_url"] = avatar_url 
 
-        wait_for_response = 'true' if wait_for_response else 'false'
+        wait_param = 'true' if wait_for_response else 'false'
 
         encoded, mimetype = message.encode(followup=True, **encode_kwargs)
 
@@ -77,7 +77,7 @@ class Webhook(LoadableDataclass):
             self.url,
             data=encoded.encode("UTF-8"),
             headers={"Content-Type": mimetype},
-            params={"wait": wait_for_response}
+            params={"wait": wait_param}
         )
         response = requests.post(self.url,data=encoded.encode("UTF-8"),headers={"Content-Type": mimetype},params={"wait": wait_for_response})
         response.raise_for_status()
@@ -200,3 +200,11 @@ class PendingWebhook(LoadableDataclass):
     def execute_callback(self, webhook: Webhook):
         "Executes the callback for registering this Webhook"
         return self.callback(webhook, self.ctx, *self.callback_args, **self.callback_kwargs)
+
+    def to_dict(self):
+        _discord_interactions = self.ctx.discord
+        try:
+            self.ctx.discord = None
+            return super().to_dict()
+        finally:
+            self.ctx.discord = _discord_interactions
