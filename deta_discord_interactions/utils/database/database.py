@@ -34,9 +34,11 @@ class Database:
         return Record(key, database=self, data=None)
 
     def __setitem__(self, key: str, data: dict) -> None:
-        key = transform_identifier(key)
         self.put(key, data)
     
+    def __delitem__(self, key: str) -> None:
+        self.delete(key)
+
     @typing.overload
     def encode_entry(self, record: dict) -> dict: ...
     @typing.overload
@@ -103,7 +105,8 @@ class Database:
 
 
     def get(self, key: str) -> Record:
-        "Retrieve a record based on it's key."
+        """Retrieve a record based on it's key. 
+        If it does not exists, prepare a blank one with that key"""
         key = transform_identifier(key)
         data = self.__base.get(key)
         if data is None:
@@ -122,6 +125,11 @@ class Database:
         self.__base.put(self.encode_entry(data), key)
         return Record(key, self, data)
     
+    def delete(self, key: str) -> None:
+        "Deletes a record."
+        key = transform_identifier(key)
+        self.__base.delete(key)
+
     def put_many(self, data: list[dict]) -> list[Record]:
         "Insert or update multiple records and return them."
         for record in data:

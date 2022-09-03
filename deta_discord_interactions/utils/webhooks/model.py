@@ -89,17 +89,21 @@ class Webhook(LoadableDataclass):
         response.raise_for_status()
         return Webhook.from_dict(response.json())
 
-    def patch(self, *, name: str = None, avatar: str = None, reason: str = None):
+    def patch(self, *, name: Optional[str] = None, avatar: Optional[str] = None, reason: Optional[str] = None):
         """Updates this webhook
 
         Parameters
         ----------
+        name : str
+            Change the default name of the Webhook 
+        avatar
+            NOT SUPPORTED YET
         reason : str
-            Audit Log reason explaining why it was deleted
+            Audit Log reason explaining why it was updated
 
         NOTE: Does not updates the library's database automatically
         """
-        if name is None and avatar is None:
+        if (name is None) and (avatar is None):
             raise ValueError("You must provide at least one of `name` and `avatar` to Webhook.patch()")
         if avatar is not None:
             raise NotImplementedError("Updating the Avatar is not supported yet")

@@ -117,4 +117,4 @@ class Query:
     #     return Query(self.operations, other.operations)
 
     def to_list(self) -> list[dict]:
-        return self.operations
+        return list(self.operations)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typing
 from typing import Any, Optional
+from deta.base import Util
 from deta_discord_interactions.utils.database.bound_list import BoundList
 from deta_discord_interactions.utils.database.bound_dict import BoundDict
 from deta_discord_interactions.utils.database.exceptions import KeyNotFound
@@ -60,7 +61,7 @@ class Record:
         return result
 
     def __setattr__(self, attribute: str, value: Any) -> None:
-        if attribute in ('key', 'setdefault') or attribute.startswith("_"):
+        if attribute in ('get', 'key', 'setdefault') or attribute.startswith("_"):
             return super().__setattr__(attribute, value)
         if self._preparing_statement:
             self._prepared_statement[attribute] = value
@@ -93,7 +94,8 @@ class Record:
 
     def __delattr__(self, attribute: str) -> None:
         del self._data[attribute]
-        self._database.update(self.key, {"$trim": {attribute: 1}})
+        self._database.update(self.key, {attribute: Util.Trim()})
+
 
     def setdefault(self, key: str, value: Any) -> Any:
         try:
@@ -105,3 +107,9 @@ class Record:
                 value = BoundDict(key, self, value)
             self[key] = value
             return value
+
+    def get(self, key: str) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return None
