@@ -4,7 +4,7 @@ import io
 import json
 import os
 from typing import Any, Callable, NoReturn
-from urllib.parse import quote
+from urllib.parse import quote, unquote
 
 import requests
 from deta_discord_interactions.models.component import ActionRow, Button, ButtonStyles
@@ -108,6 +108,7 @@ def create_webhook(
             Button(
                 style=ButtonStyles.LINK,
                 url=link,
+                label="Create Webhook",
             )
         ])],
         # ephemeral=True,
@@ -139,7 +140,7 @@ def _handle_oauth(
             'client_secret': os.getenv("DISCORD_CLIENT_SECRET"),
             'grant_type': 'authorization_code',
             'code': code,
-            'redirect_uri': redirect_uri,
+            'redirect_uri': unquote(redirect_uri),
         }
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -179,6 +180,10 @@ def _handle_oauth(
     except Exception:
         import traceback
         traceback.print_exc()
+        try:
+            print('response content', response.content, flush=True)
+        except Exception:
+            pass
         abort(500, "Something went wrong")
  
 

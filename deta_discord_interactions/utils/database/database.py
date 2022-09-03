@@ -26,7 +26,7 @@ ESCAPE_STRING = "$NOOP"  # Do not mess up if the user input 'just happen' to sta
 
 
 class Database:
-    def __init__(self, *, name: str = "_discord_interactions"):
+    def __init__(self, name: str = "_discord_interactions"):
         self.__base = Base(name)
 
     def __getitem__(self, key: str) -> Record:

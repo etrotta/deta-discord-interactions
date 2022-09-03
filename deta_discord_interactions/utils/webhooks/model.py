@@ -79,7 +79,6 @@ class Webhook(LoadableDataclass):
             headers={"Content-Type": mimetype},
             params={"wait": wait_param}
         )
-        response = requests.post(self.url,data=encoded.encode("UTF-8"),headers={"Content-Type": mimetype},params={"wait": wait_for_response})
         response.raise_for_status()
         if wait_for_response:
             return Message.from_dict(response.json())
