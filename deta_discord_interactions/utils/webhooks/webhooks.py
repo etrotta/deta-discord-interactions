@@ -45,6 +45,7 @@ def create_webhook(
     callback: Callable,
     args: tuple = (),
     kwargs: dict = {},
+    message_content: str = "Use the button to register the Webhook"
 ) -> Message:
     """Utility function to make Webhook creation and usage easier
     
@@ -68,6 +69,8 @@ def create_webhook(
     args : tuple|list
     kwargs : dict
         Arguments and Keyword arguments to be passed onto callback
+    message_content : str
+        Message content, besides the button with the URL
 
 
     If the user never finishes creating a webhook, the callback will not be called
@@ -91,19 +94,19 @@ def create_webhook(
     with pending_webhooks[internal_id] as record:
         record["pending_webhook"] = promise
         record["redirect_uri"] = redirect_uri
-        # record["__expires_in"] = 600
 
     link = (
         f"{DISCORD_BASE_URL}/oauth2/authorize?"
         "response_type=code&"
         "scope=webhook.incoming&"
+        f"guild_id={ctx.guild_id}&"
         f"client_id={os.getenv('DISCORD_CLIENT_ID')}&"
         f"state={internal_id}&"
         f"redirect_uri={redirect_uri}"
     )
 
     return Message(
-        "Use the button to register the Webhook",
+        message_content,
         components=[ActionRow([
             Button(
                 style=ButtonStyles.LINK,
@@ -111,7 +114,7 @@ def create_webhook(
                 label="Create Webhook",
             )
         ])],
-        # ephemeral=True,
+        ephemeral=True,
     )
 
 

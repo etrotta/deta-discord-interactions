@@ -113,7 +113,7 @@ class DiscordInteractionsBlueprint:
         dm_permission: bool = None,
         name_localizations: Dict[str, str] = None,
         description_localizations: Dict[str, str] = None,
-    ):
+    ) -> Callable[[Callable], Command]:
         """
         Decorator to create a new :class:`Command`.
 

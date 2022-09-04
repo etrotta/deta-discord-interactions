@@ -108,8 +108,8 @@ class Record:
             self[key] = value
             return value
 
-    def get(self, key: str) -> Any:
+    def get(self, key: str, default: Any = None) -> Any:
         try:
             return self[key]
         except KeyError:
-            return None
+            return default

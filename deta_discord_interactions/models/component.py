@@ -147,11 +147,11 @@ class Button(CustomIdComponent):
         super().__post_init__()
 
         if self.style == ButtonStyles.LINK:
-            if self.url is None:
-                raise ValueError("Link buttons require a url")
+            if self.url is None or self.label is None:
+                raise ValueError("Link buttons must have an url and label")
         else:
             if self.custom_id is None:
-                raise ValueError("Buttons require custom_id")
+                raise ValueError("Buttons must have a custom_id")
 
         if isinstance(self.custom_id, list) or isinstance(self.custom_id, tuple):
             self.custom_id = "\n".join(str(item) for item in self.custom_id)
