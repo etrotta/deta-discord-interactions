@@ -42,6 +42,7 @@ class DiscordInteractionsBlueprint:
     def __init__(self):
         self.discord_commands = {}
         self.custom_id_handlers = {}
+        self.tasks = []
 
     def add_command(
         self,
@@ -163,6 +164,16 @@ class DiscordInteractionsBlueprint:
 
         return decorator
 
+    def task(self):
+        """
+        Decorator to add a new Task.
+        The Micro must be set to run on CRON for them to run at all.
+        """
+        def decorator(func):
+            self.tasks.append(func)
+            return func
+        return decorator
+
     def command_group(
         self,
         name: str,
@@ -271,6 +282,9 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         except KeyError:
             raise Exception("Please fill in the .env files with your application's credentials.")
         self.__routes = {}
+        # For Deta Micro CRON
+        self._deta_type = "probably_wsgi"
+        self.lib = self.run_tasks
 
     def fetch_token(self):
         """
@@ -327,17 +341,14 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         Update the list of commands registered with Discord.
         This method will overwrite all existing commands.
 
-        Make sure you aren't calling this every time a new worker starts! You
-        will run into rate-limiting issues if multiple workers attempt to
-        register commands simultaneously. Read :ref:`workers` for more
-        info.
-
         Parameters
         ----------
         guild_id: str
             The ID of the Discord guild to register commands to. If omitted,
             the commands are registered globally.
         """
+        if os.getenv("DETA_RUNTIME") is not None:  # It *would* work, it's just a big waste and may slow down the bot overall
+            raise Exception("Cannot register commands from inside a Deta Micro")
 
         if guild_id:
             url = (
@@ -487,6 +498,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         """
         self.discord_commands.update(blueprint.discord_commands)
         self.custom_id_handlers.update(blueprint.custom_id_handlers)
+        self.tasks.extend(blueprint.tasks)
 
     def run_command(self, data: dict):
         """
@@ -564,6 +576,14 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         return command.make_context_and_run_autocomplete(discord=self, data=data)
 
+    def run_tasks(self, event):
+        """Runs all registered Tasks. 
+        If there are more than one registerd tasks, they may run asynchronously and out of order."""
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor() as executor:
+            for task in self.tasks:
+                executor.submit(task)
+
 
     def verify_signature(self, request):
         """
@@ -574,8 +594,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         request
             The request to verify the signature of.
         """
-        # signature = request.get("X-Signature-Ed25519")
-        # timestamp = request.get("X-Signature-Timestamp")
         signature = request.get("HTTP_X_SIGNATURE_ED25519")
         timestamp = request.get("HTTP_X_SIGNATURE_TIMESTAMP")
 
@@ -622,7 +640,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         interaction_type = request["json"].get("type")
         if interaction_type == InteractionType.PING:
-            # abort(jsonify({"type": ResponseType.PONG}))
             return PongResponse()
         elif interaction_type == InteractionType.APPLICATION_COMMAND:
             return self.run_command(request["json"])
