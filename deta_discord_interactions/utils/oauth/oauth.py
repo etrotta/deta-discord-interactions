@@ -1,9 +1,7 @@
 "Deals with OAuth2, creating and saving Webhooks"
-import datetime
-import io
 import json
 import os
-from typing import Any, Callable, NoReturn
+from typing import Callable, NoReturn
 from urllib.parse import quote, unquote
 
 import requests
@@ -15,69 +13,70 @@ from deta_discord_interactions.discord import DiscordInteractions
 from deta_discord_interactions.context import Context
 
 from deta_discord_interactions.utils.database import Database
-
-from deta_discord_interactions.utils.webhooks.model import Webhook, PendingWebhook
-
-
-if os.getenv("DONT_REGISTER_WITH_DISCORD"):
-    DISCORD_BASE_URL = 'http://localhost:8000'
-    DEFAULT_MICRO_PATH = "RUN_APP_METHODS_INSTEAD"
-else:
-    DISCORD_BASE_URL = 'https://discord.com/api/v10'
-    DEFAULT_MICRO_PATH = "https://{MICRO}.deta.dev"
-
-pending_webhooks = Database(name="_discord_interactions_pending_webhooks")
-confirmed_webhooks = Database(name="_discord_interactions_confirmed_webhooks")
+from deta_discord_interactions.utils.oauth.model import OAuthToken, PendingOAuth
 
 
-def enable_webhooks(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
-    "Allows for the app to receive and process OAuth webhooks"
+DISCORD_BASE_URL = 'https://discord.com/api/v10'
+DEFAULT_MICRO_PATH = "https://{MICRO}.deta.dev"
+
+pending_oauths = Database(name="_discord_interactions_pending_oauths")
+
+
+def enable_oauth(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
+    "Allows for the app to receive and process OAuth and create Webhooks"
     app.route(path)(_handle_oauth)
 
 
-def create_webhook(
+def request_oauth(
     ctx: Context,
     /,
     internal_id: str,
+    *,
     domain: str = DEFAULT_MICRO_PATH,
     path: str = "/oauth",
-    *,
+    scopes: list[str],
     callback: Callable,
     args: tuple = (),
     kwargs: dict = {},
-    message_content: str = "Use the button to register the Webhook"
+    message_content: str = "Use the button to register with OAuth",
+    button_label: str = "Grant OAuth",
 ) -> Message:
-    """Utility function to make Webhook creation and usage easier
+    """Utility function to make OAuth creation and usage easier
     
-    Returns a Message with a link the user must visit to create a webhook,
-    and save a PendingWebhook in the internal database.
+    Returns a Message with a link the user must visit to grant an OAuth Token,
+    and save a PendingOAuth in the internal database.
 
     Parameters
     ----------
     ctx : Context
         The Context this function is being called from
     internal_id : str
-        ID to be used internally
+        ID to be used internally. Will be shown in the link.. Will be shown in the link.
     domain : str, default https://{MICRO}.deta.dev
--        Base URL for the Micro running the bot
+        Base URL for the Micro running the bot
         {MICRO} is filled automatically from the environment variables
     path : str, default '/oauth'
         Path that the user will be sent back to. 
         Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
+    scopes : list[str]
+        List of scopes to request.
     callback : Callable
         Must be a normal function, not a lambda, partial nor a class method.
     args : tuple|list
     kwargs : dict
         Arguments and Keyword arguments to be passed onto callback
+        The created newly created OAuthToken and Context passed to request_oauth are always passed first.
     message_content : str
         Message content, besides the button with the URL
+    button_label : str
+        The URL Button's label
 
 
-    If the user never finishes creating a webhook, the callback will not be called
+    If the user never finishes the authorization process, the callback will not be called
     If they create one , it will be called with ctx, webhook, `args` and `kwargs`
-    The link will only work for one webhook
+    The link will only work for one authorization
     """
-    promise = PendingWebhook(
+    promise = PendingOAuth(
         ctx,
         callback.__module__,
         callback.__name__,
@@ -91,14 +90,14 @@ def create_webhook(
         )
     )
 
-    with pending_webhooks[internal_id] as record:
-        record["pending_webhook"] = promise
+    with pending_oauths[internal_id] as record:
+        record["pending_oauth"] = promise
         record["redirect_uri"] = redirect_uri
 
     link = (
         f"{DISCORD_BASE_URL}/oauth2/authorize?"
         "response_type=code&"
-        "scope=webhook.incoming&"
+        f"scope={' '.join(scopes)}&"
         f"guild_id={ctx.guild_id}&"
         f"client_id={os.getenv('DISCORD_CLIENT_ID')}&"
         f"state={internal_id}&"
@@ -111,11 +110,73 @@ def create_webhook(
             Button(
                 style=ButtonStyles.LINK,
                 url=link,
-                label="Create Webhook",
+                label=button_label,
             )
         ])],
         ephemeral=True,
     )
+
+
+# Mostly for convenience and more... idk, semantic
+def create_webhook(
+    ctx: Context,
+    /,
+    internal_id: str,
+    domain: str = DEFAULT_MICRO_PATH,
+    path: str = "/oauth",
+    *,
+    callback: Callable,
+    args: tuple = (),
+    kwargs: dict = {},
+    message_content: str = "Use the button to register the Webhook",
+    button_label: str = "Create Webhook",
+) -> Message:
+    """Utility function to make Webhook creation and usage easier
+    
+    Returns a Message with a link the user must visit to create a webhook,
+    and save a PendingWebhook in the internal database.
+
+    Parameters
+    ----------
+    ctx : Context
+        The Context this function is being called from
+    internal_id : str
+        ID to be used internally. Will be shown in the link.
+    domain : str, default https://{MICRO}.deta.dev
+-        Base URL for the Micro running the bot
+        {MICRO} is filled automatically from the environment variables
+    path : str, default '/oauth'
+        Path that the user will be sent back to. 
+        Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
+    callback : Callable
+        Must be a normal function, not a lambda, partial nor a class method.
+    args : tuple|list
+    kwargs : dict
+        Arguments and Keyword arguments to be passed onto callback.
+        The created newly created OAuthToken and Context passed to create_webhook are always passed first.
+    message_content : str
+        Message content, besides the button with the URL
+    button_label : str
+        The Label of the button
+
+
+    If the user never finishes creating a webhook, the callback will not be called
+    If they create one , it will be called with ctx, webhook, `args` and `kwargs`
+    The link will only work for one webhook
+    """
+    return request_oauth(
+        ctx,
+        internal_id,
+        domain=domain,
+        path=path,
+        scopes=['webhook.incoming'],
+        callback=callback,
+        args=args,
+        kwargs=kwargs,
+        message_content=message_content,
+        button_label=button_label,
+    )
+
 
 
 def _handle_oauth(
@@ -134,9 +195,11 @@ def _handle_oauth(
 
     try:
 
-        with pending_webhooks[state] as record:
+        with pending_oauths[state] as record:
             redirect_uri: str = record["redirect_uri"]
-            pending_webhook: PendingWebhook = record["pending_webhook"]
+            pending_oauth: PendingOAuth = record["pending_oauth"]
+
+        del pending_oauths[state]
 
         data = {
             'client_id': os.getenv("DISCORD_CLIENT_ID"),
@@ -152,22 +215,9 @@ def _handle_oauth(
         response.raise_for_status()
         result = response.json()
 
-        webhook = Webhook(
-            id=result["webhook"]["id"],
-            token=result["webhook"]["token"],
-            name=result["webhook"]["name"],
-            avatar=result["webhook"]["avatar"],
-            guild_id=result["webhook"]["guild_id"],
-            channel_id=result["webhook"]["channel_id"],
-        )
+        oauth_token = OAuthToken.from_dict(result)
 
-        with confirmed_webhooks[state] as record:
-            record["access_token"] = result["access_token"]
-            record["refresh_token"] = result["refresh_token"]
-            record["expires_at"] = datetime.datetime.utcnow() + datetime.timedelta(seconds=604800)
-            record["webhook"] = webhook
-
-        callback_response = pending_webhook.execute_callback(webhook)
+        callback_response = pending_oauth.execute_callback(oauth_token)
 
         if isinstance(callback_response, (dict, list, int, str)):
             callback_response = json.dumps(callback_response)
@@ -179,7 +229,7 @@ def _handle_oauth(
 
         start_response("200 OK", [('Content-Type', 'application/json')])
         return [callback_response]
-    
+
     except Exception:
         import traceback
         traceback.print_exc()
@@ -188,52 +238,3 @@ def _handle_oauth(
         except Exception:
             pass
         abort(500, "Something went wrong")
- 
-
-def fake_user_webhook_confirmation(
-    app: DiscordInteractions,
-    message: Message,
-) -> tuple[Any, Any]:
-    """
-    Pretends that the user visited the app and selected a channel to send Webhooks to,
-    for developing and testing locally
-
-    Parameters
-    ----------
-    app : DiscordInteractions
-        The main app receiving requests
-    message : Message
-        The message returned by `create_webhook`
-
-    Returns
-    -------
-    fake server response : Any
-        JSON data returned by the fake server when making the fake user interaction
-    app response : Any
-        JSON data returned by the app when making the fake rediction
-    """
-    action_row: ActionRow = message.components[0]
-    button: Button = action_row.components[0]
-    url: str = button.url
-
-    from deta_discord_interactions.utils.webhooks._local_http import run_local_server
-    run_local_server()
-
-    response = requests.get(url)
-    response.raise_for_status()
-    data = response.json()
-
-    query_string = "&".join(f"{key}={data[key]}" for key in ('code', 'state', 'guild_id'))
-
-    # redirect_to = f"{data['redirect_uri']}?{query_string}"
-
-    result = app(
-        {
-            "wsgi.input": io.BytesIO(),
-            "PATH_INFO": "/oauth",
-            "QUERY_STRING": query_string,
-        },
-        lambda code, headers: None
-    )
-
-    return data, json.loads(result[0].decode('UTF-8'))

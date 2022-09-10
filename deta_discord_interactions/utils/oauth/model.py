@@ -1,13 +1,106 @@
 import os
 import importlib
-from dataclasses import dataclass
+import datetime
 from typing import Optional
+from dataclasses import dataclass
 
 import requests
+from deta_discord_interactions.models.user import User
+from deta_discord_interactions.models.message import Message
 
 from deta_discord_interactions.models.utils import LoadableDataclass
-from deta_discord_interactions.models.message import Message
 from deta_discord_interactions.context import Context
+
+
+@dataclass
+class OAuthApplication(LoadableDataclass):
+    id: str
+    name: str
+    icon: str
+    description: str
+    bot_public: bool
+    bot_require_code_grant: bool
+    verify_key: str
+    hook: bool = False
+
+
+@dataclass
+class OAuthInfo(LoadableDataclass):
+    application: OAuthApplication
+    scopes: list[str]
+    expires: datetime.datetime
+    user: User
+
+    def __post_init__(self):
+        if isinstance(self.application, dict):
+            self.user = OAuthApplication.from_dict(self.user)
+        if isinstance(self.user, dict):
+            self.user = User.from_dict(self.user)
+        if isinstance(self.expires, str):
+            self.expires = datetime.datetime.fromisoformat(self.expires)
+        if isinstance(self.scopes, str):
+            self.scopes = self.scopes.split()
+
+
+@dataclass
+class OAuthToken(LoadableDataclass):
+    access_token: str
+    expire_date: datetime.datetime
+    scopes: list[str]
+    webhook: 'Webhook' = None
+
+    def __post_init__(self):
+        if isinstance(self.expire_date, int):
+            self.expire_date = datetime.datetime.utcnow() + datetime.timedelta(seconds=int(self.expire_date))
+        if isinstance(self.scopes, str):
+            self.scopes = self.scopes.split()
+        if isinstance(self.webhook, dict):
+            self.webhook = Webhook.from_dict(self.webhook)
+
+    def get_user_data(self) -> OAuthInfo:
+        headers = {
+            "Authorization": f"Bearer {self.access_token}"
+        }
+        response = requests.get(f'https://discord.com/api/v10/oauth/@me', headers=headers)
+        response.raise_for_status()
+        return OAuthInfo.from_dict(response.json())
+
+    def revoke(self) -> None:
+        response = requests.post(
+            "https://discord.com/api/oauth2/token/revoke",
+            data={"token": token.access_token},
+            auth=(os.getenv("DISCORD_CLIENT_ID"), os.getenv("DISCORD_CLIENT_SECRET"))
+        )
+        response.raise_for_status()
+
+
+
+@dataclass
+class PendingOAuth(LoadableDataclass):
+    "A 'promise' of an OAuth process yet to be confirmed"
+    ctx: Context
+    callback_module: str
+    callback_name: str
+    callback_args: list
+    callback_kwargs: dict
+
+    @property
+    def callback(self):
+        module = importlib.import_module(self.callback_module)
+        function = getattr(module, self.callback_name)
+        return function
+
+    def execute_callback(self, oauth_token: OAuthToken):
+        "Executes the callback when the user finishes the OAuth process"
+        return self.callback(oauth_token, self.ctx, *self.callback_args, **self.callback_kwargs)
+
+    def to_dict(self):
+        _discord_interactions = self.ctx.discord
+        try:
+            self.ctx.discord = None
+            return super().to_dict()
+        finally:
+            self.ctx.discord = _discord_interactions
 
 
 @dataclass
@@ -29,9 +122,7 @@ class Webhook(LoadableDataclass):
     @property
     def url(self):
         if os.getenv("DONT_REGISTER_WITH_DISCORD", False):
-            from deta_discord_interactions.utils.webhooks._local_http import run_local_server
-            run_local_server()
-            return f"http://localhost:8000/api/webhooks/{self.id}/{self.token}"
+            raise Exception("Cannot interact with Webhook with `DONT_REGISTER_WITH_DISCORD` env. variable set")
 
         return f"https://discord.com/api/webhooks/{self.id}/{self.token}"
 
@@ -101,12 +192,12 @@ class Webhook(LoadableDataclass):
         reason : str
             Audit Log reason explaining why it was updated
 
-        NOTE: Does not updates the library's database automatically
+        NOTE: Does not updates any internal databases automatically
         """
         if (name is None) and (avatar is None):
             raise ValueError("You must provide at least one of `name` and `avatar` to Webhook.patch()")
         if avatar is not None:
-            raise NotImplementedError("Updating the Avatar is not supported yet")
+            raise NotImplementedError("Updating the Avatar is not supported by the library yet")
         data = {}
         headers = {}
         if name is not None:
@@ -128,8 +219,8 @@ class Webhook(LoadableDataclass):
         ----------
         reason : str
             Audit Log reason explaining why it was deleted
-        
-        NOTE: Does not removes from the library's database automatically
+
+        NOTE: Does not removes from any internal databases automatically
         """
         headers = {}
         if reason is not None:
@@ -182,32 +273,3 @@ class Webhook(LoadableDataclass):
         )
         response.raise_for_status()
         return Message.from_dict(response.json())
-
-
-
-@dataclass
-class PendingWebhook(LoadableDataclass):
-    "A 'promise' of a Webhook yet to be created"
-    ctx: Context
-    callback_module: str
-    callback_name: str
-    callback_args: list
-    callback_kwargs: dict
-
-    @property
-    def callback(self):
-        module = importlib.import_module(self.callback_module)
-        function = getattr(module, self.callback_name)
-        return function
-
-    def execute_callback(self, webhook: Webhook):
-        "Executes the callback for registering this Webhook"
-        return self.callback(webhook, self.ctx, *self.callback_args, **self.callback_kwargs)
-
-    def to_dict(self):
-        _discord_interactions = self.ctx.discord
-        try:
-            self.ctx.discord = None
-            return super().to_dict()
-        finally:
-            self.ctx.discord = _discord_interactions
