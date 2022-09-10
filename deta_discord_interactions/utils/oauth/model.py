@@ -59,7 +59,7 @@ class OAuthToken(LoadableDataclass):
         headers = {
             "Authorization": f"Bearer {self.access_token}"
         }
-        response = requests.get(f'https://discord.com/api/v10/oauth/@me', headers=headers)
+        response = requests.get(f'https://discord.com/api/v10/oauth2/@me', headers=headers)
         response.raise_for_status()
         return OAuthInfo.from_dict(response.json())
 
