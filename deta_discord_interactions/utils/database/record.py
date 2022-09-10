@@ -161,6 +161,9 @@ class AutoSyncRecord(Record):
     def __delitem__(self, key: str) -> None:
         self.delete_field(key)
 
+    def get(self, key: str) -> Any:
+        return self.get_field(key, None)
+
     def setdefault(self, key: str, value: Any) -> Any:
         try:
             return self.get_field(key)
