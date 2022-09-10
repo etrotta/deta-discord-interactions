@@ -50,7 +50,7 @@ class User(LoadableDataclass):
     bot: bool = None
     system: bool = None
     mfa_enabled: bool = None
-    banner: str
+    banner: str = None
     accent_color: str = None
     locale: str = None
     verified: bool = None  # Only available via OAuth with email scope
