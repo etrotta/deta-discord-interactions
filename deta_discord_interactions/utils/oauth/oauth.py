@@ -34,7 +34,7 @@ def request_oauth(
     *,
     domain: str = DEFAULT_MICRO_PATH,
     path: str = "/oauth",
-    scopes: list[str],
+    scope: str,
     callback: Callable,
     args: tuple = (),
     kwargs: dict = {},
@@ -45,6 +45,8 @@ def request_oauth(
     
     Returns a Message with a link the user must visit to grant an OAuth Token,
     and save a PendingOAuth in the internal database.
+
+    See https://discord.com/developers/docs/topics/oauth2 for the list of available scopes and more information
 
     Parameters
     ----------
@@ -58,8 +60,8 @@ def request_oauth(
     path : str, default '/oauth'
         Path that the user will be sent back to. 
         Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
-    scopes : list[str]
-        List of scopes to request.
+    scope : str
+        OAuth scopes to request, separated by spaces.
     callback : Callable
         Must be a normal function, not a lambda, partial nor a class method.
     args : tuple|list
@@ -97,7 +99,7 @@ def request_oauth(
     link = (
         f"{DISCORD_BASE_URL}/oauth2/authorize?"
         "response_type=code&"
-        f"scope={' '.join(scopes)}&"
+        f"scope={quote(scope)}&"
         f"guild_id={ctx.guild_id}&"
         f"client_id={os.getenv('DISCORD_CLIENT_ID')}&"
         f"state={internal_id}&"
@@ -169,7 +171,7 @@ def create_webhook(
         internal_id,
         domain=domain,
         path=path,
-        scopes=['webhook.incoming'],
+        scope='webhook.incoming',
         callback=callback,
         args=args,
         kwargs=kwargs,

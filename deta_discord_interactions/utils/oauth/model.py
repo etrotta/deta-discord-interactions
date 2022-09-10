@@ -38,22 +38,20 @@ class OAuthInfo(LoadableDataclass):
             self.user = User.from_dict(self.user)
         if isinstance(self.expires, str):
             self.expires = datetime.datetime.fromisoformat(self.expires)
-        if isinstance(self.scopes, str):
-            self.scopes = self.scopes.split()
 
 
 @dataclass
 class OAuthToken(LoadableDataclass):
     access_token: str
-    expire_date: datetime.datetime
-    scopes: list[str]
+    refresh_token: str
+    scope: str
+    expires_in: int
     webhook: 'Webhook' = None
+    expire_date: datetime.datetime = None
 
     def __post_init__(self):
-        if isinstance(self.expire_date, int):
-            self.expire_date = datetime.datetime.utcnow() + datetime.timedelta(seconds=int(self.expire_date))
-        if isinstance(self.scopes, str):
-            self.scopes = self.scopes.split()
+        if isinstance(self.expires_in, int) and self.expire_date is None:
+            self.expire_date = datetime.datetime.utcnow() + datetime.timedelta(seconds=self.expires_in)
         if isinstance(self.webhook, dict):
             self.webhook = Webhook.from_dict(self.webhook)
 
@@ -68,7 +66,7 @@ class OAuthToken(LoadableDataclass):
     def revoke(self) -> None:
         response = requests.post(
             "https://discord.com/api/oauth2/token/revoke",
-            data={"token": token.access_token},
+            data={"token": self.access_token},
             auth=(os.getenv("DISCORD_CLIENT_ID"), os.getenv("DISCORD_CLIENT_SECRET"))
         )
         response.raise_for_status()
