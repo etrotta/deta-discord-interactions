@@ -112,6 +112,8 @@ class Query:
     def __init__(self, *operations: dict):
         self.operations = {}
         for operation in operations:
+            if not isinstance(operation, dict):
+                raise TypeError("All operations passed to Query() must be dictionaries")
             # Check if there are any operations already in use
             if repeated := (self.operations.keys() & operation.keys()):
                 _repeated = {k: (self.operations.get(k), operation.get(k)) for k in repeated}
