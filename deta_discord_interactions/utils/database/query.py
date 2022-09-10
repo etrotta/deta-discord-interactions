@@ -29,7 +29,7 @@ query = Query(Field('name') == 'bob') & Query(Field('age') > 10)
 results = database.fetch(query)
 """
 
-from typing import Union
+from typing import NoReturn
 from deta_discord_interactions.utils.database.adapters import transform_identifier
 
 class Field:
@@ -103,18 +103,58 @@ class Field:
 
 class Query:
     """Query class for querying Deta Base.
-    the `operations` may be either lists of dictionaries or just dictionaries, but not mixed
-    """
-    def __init__(self, *operations: Union[list[dict], dict]):
-        # if len(operations) == 1 and all(isinstance(op, dict) for op in operations):
-        #     operations = [operations]
-        self.operations = operations
     
-    def __and__(self, other: 'Query') -> 'Query':  # &
-        return Query(*[*self.operations, *other.operations])
+    Example usage:
+    >>> Query(Field("key").startswith("bird_"))  # Key starts with bird_
+    >>> Query(Field("species") == "cat", Field("age") < 5)  # Cat AND less than 5 years old
+    >>> Query(Field("species") == "cat") | Query(Field("species") == "dog")  # Dog OR Cat
+    """
+    def __init__(self, *operations: dict):
+        self.operations = {}
+        for operation in operations:
+            # Check if there are any operations already in use
+            if repeated := (self.operations.keys() & operation.keys()):
+                _repeated = {k: (self.operations.get(k), operation.get(k)) for k in repeated}
+                raise ValueError(f"Repeated operations found in Query: {_repeated}")
+            self.operations.update(operation)
 
-    # def __or__(self, other: 'Query') -> 'Query':  # |
-    #     return Query(self.operations, other.operations)
+    def __and__(self, other: 'Query') -> 'Query':  # &
+        # if isinstance(other, Query):
+        if type(other) == Query:
+            return Query(self.operations, other.operations)
+            # raise NotImplementedError()
+        raise TypeError("Can only AND a query with another Query")
+
+    def __or__(self, other: 'Query') -> 'ORQuery':  # |
+        # if isinstance(other, Query):
+        if type(other) == Query:
+            return ORQuery(self, other)
+            # raise NotImplementedError()
+        raise TypeError("Can only OR a query with another Query")
 
     def to_list(self) -> list[dict]:
-        return list(self.operations)
+        "Returns a list of length 1 containing this Query's operations"
+        return [self.operations]
+
+
+# tbh it only subclasses so that it may pass isinstance() checks,
+# maybe I should be using a Protocol instead
+class ORQuery(Query):
+    """OR'ed Query class for querying Deta Bases. 
+    Do not create directly - use Query(...) | Query(...) instead"""
+    def __init__(self, *queries: Query):
+        self.queries = queries
+
+    def __and__(self, _) -> NoReturn:  # &
+        raise Exception("Cannot add an AND statement to an OR query")
+
+    def __or__(self, other: 'Query') -> 'ORQuery':  # |
+        if isinstance(other, ORQuery):
+            return ORQuery(*self.queries, *other.queries)
+        elif isinstance(other, Query):
+            return ORQuery(*self.queries, other)
+        raise TypeError("Can only OR with another Query")
+
+    def to_list(self) -> list[list[dict]]:
+        "Returns a 1D list containing this queries's operations"
+        return [query.operations for query in self.queries]
