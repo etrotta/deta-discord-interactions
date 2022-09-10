@@ -36,7 +36,7 @@ def request_oauth(
     path: str = "/oauth",
     scope: str,
     callback: Callable,
-    args: tuple = (),
+    args: tuple = [],
     kwargs: dict = {},
     message_content: str = "Use the button to register with OAuth",
     button_label: str = "Grant OAuth",

@@ -24,6 +24,7 @@ from deta import Base
 from deta_discord_interactions.utils.database._local_base import Base as LocalBase
 
 # Instructions for encoding / decoding data not supported by deta base
+EMPTY_LIST_STRING = "$EMPTY_LIST"  # Setting a field to an empty list sets it to `null`
 EMPTY_DICTIONARY_STRING = "$EMPTY_DICT"  # Setting a field to an empty dictionaries seems to set it to `null`
 DATETIME_STRING = "$ENCODED_DATETIME"  # Ease datetime conversion
 ESCAPE_STRING = "$NOOP"  # Do not mess up if the user input 'just happen' to start with a $COMMAND
@@ -74,6 +75,8 @@ class Database(Generic[Key, RecordType]):
         for key, value in record.items():
             if isinstance(value, dict) and dict(value) == {}:  # Empty dict becomes `null` on deta base on update
                 record[key] = EMPTY_DICTIONARY_STRING
+            elif isinstance(value, list) and list(value) == []:  # Empty lists becomes `null` on deta base on update
+                record[key] = EMPTY_LIST_STRING
             elif inspect.isfunction(value):  # Converts functions to references based on their source file and name
                 # This should only be used if this record is only going to be stored for a short amount of time
                 # And even then, it should be using sparingly
@@ -110,16 +113,9 @@ class Database(Generic[Key, RecordType]):
 
     def decode_entry(self, record: dict) -> Union[dict, LoadableDataclass]:
         "Converts back some changes that we may make when storing. May modify in-place."
-        try:
-            return self._load_encoded(record)
-        except KeyError:
-            pass
         for key, value in record.items():
             if isinstance(value, dict):  # Make sure we hit nested fields
-                try:  # Check if it is an encoded Dataclass or function
-                    record[key] = self._load_encoded(value)
-                except KeyError:
-                    record[key] = self.decode_entry(value)
+                record[key] = self.decode_entry(value)
             elif isinstance(value, list):  # Convert all list elements. NOTE: Currently won't work for 2D lists
                 record[key] = [
                     self.decode_entry(element) if isinstance(element, dict) else element
@@ -128,10 +124,17 @@ class Database(Generic[Key, RecordType]):
             elif isinstance(value, str):  # Revert our custom 'special' strings
                 if value == EMPTY_DICTIONARY_STRING:  # Empty dict becomes `null` on deta base
                     record[key] = {}
+                elif value == EMPTY_LIST_STRING:  # Empty lists becomes `null` on deta base
+                    record[key] = []
                 elif value.startswith(DATETIME_STRING):  # Ease datetime conversion
                     record[key] = datetime.fromisoformat(value.removeprefix(DATETIME_STRING))
                 elif value.startswith(ESCAPE_STRING):  # Escape strings starting with `$`
                     record[key] = value.removeprefix(ESCAPE_STRING)
+
+        try:  # Check if it is an encoded Dataclass or function
+            return self._load_encoded(record)
+        except KeyError:
+            pass
         return record
 
     def get(self, key: str) -> RecordType:
