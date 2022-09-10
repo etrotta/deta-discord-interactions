@@ -25,8 +25,16 @@ class User(LoadableDataclass):
         Whether the user is a Discord system account.
     mfa_enabled
         Whether the user has enabled Two-Factor Authentication.
+    banner
+        The unique hash identifying the banner of the user.
+    accent_color
+        The user's banner color encoded as an integer representation of hexadecimal color code
     locale
         The locale of the user.
+    verified
+        Whenever the user has verified their email. Only available via OAuth with email scope.
+    email
+        The user's email. Only available via OAuth with email scope.
     flags
         Miscellaneous information about the user.
     premium_type
@@ -42,7 +50,11 @@ class User(LoadableDataclass):
     bot: bool = None
     system: bool = None
     mfa_enabled: bool = None
+    banner: str
+    accent_color: str = None
     locale: str = None
+    verified: bool = None  # Only available via OAuth with email scope
+    email: str = None  # Only available via OAuth with email scope
     flags: int = None
     premium_type: int = None
     public_flags: int = None
