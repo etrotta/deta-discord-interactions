@@ -33,7 +33,7 @@ class OAuthInfo(LoadableDataclass):
 
     def __post_init__(self):
         if isinstance(self.application, dict):
-            self.user = OAuthApplication.from_dict(self.application)
+            self.application = OAuthApplication.from_dict(self.application)
         if isinstance(self.user, dict):
             self.user = User.from_dict(self.user)
         if isinstance(self.expires, str):
