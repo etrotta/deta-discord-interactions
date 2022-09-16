@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import typing
 import dataclasses
+import copy
 from typing import Any, Optional
 from typing import TypeVar
+
 from deta.base import Util
+
+from deta_discord_interactions.models.utils import LoadableDataclass
 from deta_discord_interactions.utils.database.bound_list import BoundList
 from deta_discord_interactions.utils.database.bound_dict import BoundDict
 from deta_discord_interactions.utils.database.exceptions import FieldNotFoundError, KeyNotFound
@@ -17,7 +21,7 @@ class Record:
 
     Direct usage is not recommended. Either:
     - Use AutoSyncRecord
-    - Subclass and use with dataclasses @dataclass
+    - Subclass and use with dataclasses @dataclass. You MUST set default values for all fields.
     - Subclass and overwrite `__init__`, (classmethod) `from_database`, `to_dict`
     """
     def __init__(self, **kwargs):
@@ -34,6 +38,7 @@ class Record:
     def from_dict(cls, data: dict) -> 'RecordType':
         if dataclasses.is_dataclass(cls):
             data = {
+                # field.name: data.get(field.name) for field in dataclasses.fields(cls)
                 field.name: value for field in dataclasses.fields(cls)
                 if (value := data.get(field.name)) is not None
             }
@@ -45,10 +50,14 @@ class Record:
             raise TypeError(f"Error while loading class {cls!r}, parameters supplied: {data}")
 
     def to_dict(self) -> dict:
-        if dataclasses.is_dataclass(self):
-            data = dataclasses.asdict(self)
+        data = copy.copy(self)
+        for attr, val in vars(data).items():
+            if isinstance(val, LoadableDataclass):
+                setattr(data, attr, val.to_dict())
+        if dataclasses.is_dataclass(data):
+            data = dataclasses.asdict(data)
         else:
-            data = {k: v for k, v in vars(self).items() if not k.startswith("_")}
+            data = {k: v for k, v in vars(data).items() if not k.startswith("_")}
         return data
 
 # Typing stuff
