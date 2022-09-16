@@ -75,7 +75,7 @@ class Database(Generic[Key, RecordType]):
         for key, value in record.items():
             if isinstance(value, dict) and dict(value) == {}:  # Empty dict becomes `null` on deta base on update
                 record[key] = EMPTY_DICTIONARY_STRING
-            elif isinstance(value, list) and list(value) == []:  # Empty lists becomes `null` on deta base on update
+            elif isinstance(value, (list, tuple)) and list(value) == []:  # Empty lists becomes `null` on deta base on update
                 record[key] = EMPTY_LIST_STRING
             elif inspect.isfunction(value):  # Converts functions to references based on their source file and name
                 # This should only be used if this record is only going to be stored for a short amount of time
