@@ -186,11 +186,10 @@ def _handle_oauth(
     start_response: Callable[[str, list], None],
     abort: Callable[[int, str], NoReturn],
 ) -> list[str]:
-    try:
-        code = request["query_dict"]["code"]
-        state = request["query_dict"]["state"]
-        # guild_id = request["query_dict"]["guild_id"]
-    except KeyError:
+    state = request["query_dict"].get("state")  # Must always be present
+    code = request["query_dict"].get("code")  # Only on Success
+    error = request["query_dict"].get("error")  # Only on Cancelled
+    if state is None or (error is None and code is None):
         abort(400, 'Invalid URL')
 
     url = DISCORD_BASE_URL + "/oauth2/token"
@@ -203,21 +202,25 @@ def _handle_oauth(
 
         del pending_oauths[state]
 
-        data = {
-            'client_id': os.getenv("DISCORD_CLIENT_ID"),
-            'client_secret': os.getenv("DISCORD_CLIENT_SECRET"),
-            'grant_type': 'authorization_code',
-            'code': code,
-            'redirect_uri': unquote(redirect_uri),
-        }
-        headers = {
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        response = requests.post(url, data=data, headers=headers)
-        response.raise_for_status()
-        result = response.json()
+        if error is not None:
+            oauth_token = None
 
-        oauth_token = OAuthToken.from_dict(result)
+        else:  # if code is not None:
+            data = {
+                'client_id': os.getenv("DISCORD_CLIENT_ID"),
+                'client_secret': os.getenv("DISCORD_CLIENT_SECRET"),
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': unquote(redirect_uri),
+            }
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            response = requests.post(url, data=data, headers=headers)
+            response.raise_for_status()
+            result = response.json()
+
+            oauth_token = OAuthToken.from_dict(result)
 
         callback_response = pending_oauth.execute_callback(oauth_token)
 

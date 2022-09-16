@@ -369,7 +369,7 @@ class SlashCommandSubgroup(Command):
     ):
         self.name = name
         self.description = description
-        self.subcommands = {}
+        self.subcommands: dict[str, Command] = {}
         self.type = ApplicationCommandType.CHAT_INPUT
         self.name_localizations = name_localizations
         self.description_localizations = description_localizations

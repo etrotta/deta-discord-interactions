@@ -1,10 +1,15 @@
 import copy
 from contextlib import contextmanager
+import typing
+
+from deta_discord_interactions.context import Context
+from deta_discord_interactions.models import Message
+from deta_discord_interactions.models import AutocompleteResult, Option
+from deta_discord_interactions.command import SlashCommandSubgroup
 from deta_discord_interactions.models.command import ApplicationCommandType
 
-from deta_discord_interactions.models import Message
-from deta_discord_interactions.context import Context
-from deta_discord_interactions.command import SlashCommandSubgroup
+if typing.TYPE_CHECKING:
+    from deta_discord_interactions.discord import DiscordInteractions
 
 
 class Client:
@@ -18,7 +23,7 @@ class Client:
         The DiscordInteractions object to connect to.
     """
 
-    def __init__(self, discord):
+    def __init__(self, discord: "DiscordInteractions"):
         self.discord = discord
         self.current_context = Context()
 
@@ -102,3 +107,48 @@ class Client:
 
         response = handler(new_context, *args)
         return Message.from_return_value(response)
+
+
+    def run_autocomplete(self, *names, **params):
+        """
+        Run the Autocomplete for a specified Application Command.
+
+        Parameters
+        ----------
+        *names
+            The names of the command, subcommand group, and subcommand (if
+            present). This may contain just one name (in the case of a
+            root-level command), or up to three (for a subcommand inside a
+            subcommand group).
+        **params
+            Options to pass to the command being called.
+        """
+        command = self.discord.discord_commands[names[0]]
+
+        assert command.type == ApplicationCommandType.CHAT_INPUT
+
+        i = 1
+        for i in range(1, len(names)):
+            if not isinstance(command, SlashCommandSubgroup):
+                break
+            command = command.subcommands[names[i]]
+        else:
+            i += 1
+
+        args = []
+        kwargs = {}
+        # Convert to Options
+        for arg in names[i:]:
+            args.append(Option(value=arg, name="?", type=type(arg)))
+        for kwkey, kwval in params.items():
+            kwargs[kwkey] = Option(name=kwkey, value=kwval, type=type(kwval))
+
+        # Set the last passed one as Focused
+        if kwargs:
+            kwargs[kwkey].focused = True
+        elif args:
+            args[-1].focused = True
+
+        return AutocompleteResult.from_return_value(
+            command.run_autocomplete(self.current_context, *args, **kwargs)
+        )

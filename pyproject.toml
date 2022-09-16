@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deta-discord-interactions"
-version = "0.0.1"
+version = "0.0.4"
 authors = [
   { name="etrotta", email="etrotta@duck.com" },
 ]
@@ -19,5 +19,5 @@ classifiers = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/etrotta/flask-discord-interactions"
+"Homepage" = "https://github.com/etrotta/flask-discord-interactions/tree/deta"
 "Bug Tracker" = "https://github.com/etrotta/flask-discord-interactions/issues"

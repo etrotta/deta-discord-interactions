@@ -5,10 +5,11 @@ This is a small web framework that lets you write Discord Application Commands u
 It is a fork of [flask-discord-interactions](https://pypi.org/project/Flask-Discord-Interactions/), but without requiring Flask and with some added features to make the usage of the library simpler.
 
 ```
-@discord.command()
+@app.command()
 def ping(ctx):
     "Respond with a friendly 'pong'!"
     return "Pong!"
 ```
 
-Full documentation is available on [readthedocs](https://flask-discord-interactions.readthedocs.io/).
+The documentation of the original library is available on [readthedocs](https://flask-discord-interactions.readthedocs.io/).
+The documentation of the Fork is still Work in Progress.

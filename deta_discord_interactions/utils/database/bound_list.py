@@ -30,7 +30,7 @@ class BoundList(list, metaclass=BoundMeta, bind_methods=bind_methods):
             ] = list(self)
         else:
             self._bound_record._database.update(
-                self._bound_record.key,
+                self._bound_record._key,
                 {self._bound_key: Util.Append(item)}
             )
 
@@ -43,7 +43,7 @@ class BoundList(list, metaclass=BoundMeta, bind_methods=bind_methods):
             ] = list(self)
         else:
             self._bound_record._database.update(
-                self._bound_record.key,
+                self._bound_record._key,
                 {self._bound_key: list(self)}
             )
         return value

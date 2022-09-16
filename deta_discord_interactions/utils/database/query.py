@@ -9,21 +9,22 @@ query = Query('gaming' in Field('hobbies'))
 query = Query(Field('key').startswith('discord_interactions_user_'))
 
 # Combining multiple statements:
-query = Query(  # AND
+# AND
+query = Query(
   Field('name') == 'bob',
   Field('age').in_range(10, 18)
 )
-query = Query([  # AND
-  Field('name') == 'bob',
-  Field('age').in_range(10, 18)
-])
-query = Query(  # OR
-  [Field('name') == 'bob'],
-  [Field('age').in_range(10, 18)]
-)
-# query = Query(Field('name') == 'bob') | Query(Field('age') > 10)  # Combine as OR CURRENTLY NOT IMPLEMENTED
+# Alternatively for AND:
 query = Query(Field('person.name') == 'bob') & Query(Field('age') > 10)  # Combine as AND
-query = Query(Field('name') == 'bob') & Query(Field('age') > 10)
+
+# OR
+q1 = Query(  
+  Field('name') == 'bob'
+) 
+q2 = Query(
+  Field('age').in_range(10, 18)
+)
+query = q1 | q2
 
 # To evaluate a query
 results = database.fetch(query)

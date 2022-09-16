@@ -55,13 +55,23 @@ class OAuthToken(LoadableDataclass):
         if isinstance(self.webhook, dict):
             self.webhook = Webhook.from_dict(self.webhook)
 
-    def get_user_data(self) -> OAuthInfo:
+    def get_auth_data(self) -> OAuthInfo:
+        "Returns information about the authentication, including information about the user"
         headers = {
             "Authorization": f"Bearer {self.access_token}"
         }
         response = requests.get(f'https://discord.com/api/v10/oauth2/@me', headers=headers)
         response.raise_for_status()
         return OAuthInfo.from_dict(response.json())
+
+    def get_user_data(self) -> User:
+        "Returns detailed information about the user"
+        headers = {
+            "Authorization": f"Bearer {self.access_token}"
+        }
+        response = requests.get(f'https://discord.com/api/v10/users/@me', headers=headers)
+        response.raise_for_status()
+        return User.from_dict(response.json())
 
     def revoke(self) -> None:
         response = requests.post(
@@ -88,8 +98,8 @@ class PendingOAuth(LoadableDataclass):
         function = getattr(module, self.callback_name)
         return function
 
-    def execute_callback(self, oauth_token: OAuthToken):
-        "Executes the callback when the user finishes the OAuth process"
+    def execute_callback(self, oauth_token: Optional[OAuthToken]):
+        "Executes the callback when the user finishes or cancels the OAuth process"
         return self.callback(oauth_token, self.ctx, *self.callback_args, **self.callback_kwargs)
 
     def to_dict(self):

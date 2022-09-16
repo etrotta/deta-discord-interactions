@@ -51,7 +51,7 @@ class BoundDict(dict, metaclass=BoundMeta, bind_methods=bind_methods):
                 ] = dict(self)
             else:
                 self._bound_record._database.update(
-                    self._bound_record.key,
+                    self._bound_record._key,
                     {self._bound_key: dict(self)}
                 )
         return value

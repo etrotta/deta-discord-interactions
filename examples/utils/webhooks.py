@@ -1,3 +1,4 @@
+from typing import Optional
 from deta_discord_interactions import DiscordInteractionsBlueprint
 from deta_discord_interactions import Message
 from deta_discord_interactions import Context
@@ -26,7 +27,9 @@ hooks = blueprint.command_group(
 )
 
 
-def save_webhook(oauth: OAuthToken, ctx: Context, internal_name: str):
+def save_webhook(oauth: Optional[OAuthToken], ctx: Context, internal_name: str):
+    if oauth is None:  # the user declined/canceled the OAuth consent
+        return f"Canceled creation of webhook {internal_name}"
     webhook = oauth.webhook
     key = f'webhook_{ctx.author.id}_{internal_name}'
     with database[key] as record:

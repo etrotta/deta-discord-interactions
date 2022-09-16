@@ -28,13 +28,17 @@ class Record:
     def from_database(cls, key: str, database: 'Database', record: Optional[dict]) -> 'RecordType':
         if record is None:
             record = {}
+        return cls.from_dict(record)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'RecordType':
         if dataclasses.is_dataclass(cls):
             data = {
                 field.name: value for field in dataclasses.fields(cls)
-                if (value := record.get(field.name)) is not None
+                if (value := data.get(field.name)) is not None
             }
         else:
-            data = {k: v for k, v in record if not k.startswith("_")}
+            data = {k: v for k, v in data if not k.startswith("_")}
         try:
             return cls(**data)
         except TypeError:

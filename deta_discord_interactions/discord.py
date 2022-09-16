@@ -40,9 +40,9 @@ class DiscordInteractionsBlueprint:
     """
 
     def __init__(self):
-        self.discord_commands = {}
-        self.custom_id_handlers = {}
-        self.tasks = []
+        self.discord_commands: dict[str, Command] = {}
+        self.custom_id_handlers: dict[str, Callable] = {}
+        self.tasks: list[Callable] = []
 
     def add_command(
         self,
@@ -686,6 +686,8 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
             if data["QUERY_STRING"]:
                 data["query_dict"] = dict(args.split('=', 1) for args in data["QUERY_STRING"].split("&"))
+            else:
+                data["query_dict"] = {}
 
             if data['path'] == '/discord':
                 result = self.handle_interaction(data)

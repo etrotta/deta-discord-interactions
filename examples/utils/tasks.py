@@ -1,6 +1,7 @@
 # NOTE: Remember to run `deta cron set "..."`
 # See https://docs.deta.sh/docs/micros/cron for the supported intervals
 
+from typing import Optional
 from deta_discord_interactions import DiscordInteractionsBlueprint
 from deta_discord_interactions import Message
 from deta_discord_interactions import Context
@@ -28,7 +29,9 @@ hooks = blueprint.command_group(
     dm_permission=False,
 )
 
-def save_webhook(oauth: OAuthToken, ctx: Context, internal_name: str, message: str):
+def save_webhook(oauth: Optional[OAuthToken], ctx: Context, internal_name: str, message: str):
+    if oauth is None:
+        return f"Canceled creation of webhook {internal_name}"
     webhook = oauth.webhook
     key = f'webhook_{ctx.author.id}_{internal_name}'
     with database[key] as record:

@@ -47,11 +47,13 @@ class User(LoadableDataclass):
     username: str = None
     discriminator: str = None
     avatar_hash: str = None
+    # avatar_decoration: str = None
     bot: bool = None
     system: bool = None
     mfa_enabled: bool = None
-    banner: str = None
-    accent_color: str = None
+    # banner: str = None
+    # banner_color: str = None
+    # accent_color: str = None
     locale: str = None
     verified: bool = None  # Only available via OAuth with email scope
     email: str = None  # Only available via OAuth with email scope

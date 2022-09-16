@@ -183,8 +183,6 @@ class Database(Generic[Key, RecordType]):
         for subdict in data:
             records = []
             for k, record in subdict:
-                if isinstance(record, Record):
-                    record = record.to_dict()
                 record = self.encode_entry(record)
                 record['key'] = k
                 records.append(record)
