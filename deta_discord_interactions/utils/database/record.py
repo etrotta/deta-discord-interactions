@@ -24,14 +24,14 @@ class Record:
     - Subclass and use with dataclasses @dataclass. You MUST set default values for all fields.
     - Subclass and overwrite `__init__`, (classmethod) `from_database`, `to_dict`
     """
+    _SUPPORTS_BLANK_DEFAULT = False  # If set to True, database["key"] will pass None to from_database instead of fetching
+
     def __init__(self, **kwargs):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
     @classmethod
-    def from_database(cls, key: str, database: 'Database', record: Optional[dict]) -> 'RecordType':
-        if record is None:
-            record = {}
+    def from_database(cls, key: str, database: 'Database', record: dict) -> 'RecordType':
         return cls.from_dict(record)
 
     @classmethod
@@ -68,6 +68,7 @@ RAISE_ERROR = object()  # Sentinel
 
 class AutoSyncRecord(Record):
     "Record subclass that syncs database changes automatically"
+    _SUPPORTS_BLANK_DEFAULT = True  # allows for database["key"] to give None for data instead of fetching
 
     def __init__(self, key: Key, database: 'Database', data: Optional[dict]):
         self._key = key

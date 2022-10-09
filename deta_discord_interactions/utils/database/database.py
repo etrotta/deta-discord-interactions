@@ -31,17 +31,19 @@ ESCAPE_STRING = "$NOOP"  # Do not mess up if the user input 'just happen' to sta
 
 
 class Database(Generic[Key, RecordType]):
-    def __init__(self, name: str = "_discord_interactions", record_type: Type[RecordType] = AutoSyncRecord):
+    def __init__(self, name: str = "_discord_interactions", *, record_type: Type[RecordType]):
         """Deta Base wrapper | ORM
         
         Parameters
         ----------
         name : str
             Which name to use for the Deta Base
-        record_type : RecordType, default Record
+        record_type : RecordType
             Which type of Record to return.
             You may subclass the Record class
-            if you want to specify which fields each record in that Database should have
+            if you want to specify which fields each record in that Database should have,
+            in which case you must save changes yourself,
+            or you can just use AutoSyncRecord to treat it much like a dictionary that syncs automatically
         """
         base_mode = os.getenv("DISCORD_INTERACTIONS_DATABASE_MODE", "DETA_BASE")
         if base_mode == "DETA_BASE":
@@ -56,8 +58,19 @@ class Database(Generic[Key, RecordType]):
         self.load_record = record_type.from_database
 
     def __getitem__(self, key: Key) -> RecordType:
+        """Retrieves an item from the database.
+        If the key if not found:
+        - When using AutoSyncRecord, prepares an empty record.
+        - When using other record types, raises KeyError.
+        """
         key = transform_identifier(key)
-        return self.load_record(key, self, None)
+        if self.__record_type._SUPPORTS_BLANK_DEFAULT:
+            return self.load_record(key, self, None)
+        else:
+            result = self.get(key)
+            if result is None:
+                raise KeyError(key)
+            return result
 
     def __setitem__(self, key: Key, record: Record) -> None:
         if not isinstance(record, Record):
@@ -88,7 +101,7 @@ class Database(Generic[Key, RecordType]):
             elif isinstance(value, (dict, Record, LoadableDataclass)):  # Convert nested fields 
                 record[key] = self.encode_entry(value)
             elif isinstance(value, list):  # Convert all list elements
-                # NOTE: Currently won't work for 2D lists
+                # NOTE: Currently won't work for nested lists
                 record[key] = [
                     self.encode_entry(element) 
                     if isinstance(element, (dict, LoadableDataclass)) else element 
@@ -116,7 +129,7 @@ class Database(Generic[Key, RecordType]):
         for key, value in record.items():
             if isinstance(value, dict):  # Make sure we hit nested fields
                 record[key] = self.decode_entry(value)
-            elif isinstance(value, list):  # Convert all list elements. NOTE: Currently won't work for 2D lists
+            elif isinstance(value, list):  # Convert all list elements. NOTE: Currently won't work for nested lists
                 record[key] = [
                     self.decode_entry(element) if isinstance(element, dict) else element
                     for element in value
@@ -137,13 +150,13 @@ class Database(Generic[Key, RecordType]):
             pass
         return record
 
-    def get(self, key: str) -> RecordType:
+    def get(self, key: str) -> Optional[RecordType]:
         """Retrieve a record based on it's key. 
-        If it does not exists, prepare a blank one with that key"""
+        If it does not exists, returns None"""
         key = transform_identifier(key)
         data = self.__base.get(key)
         if data is None:
-            data = {}
+            return None
         return self.load_record(key, self, self.decode_entry(data))
 
     def insert(self, key: str, data: dict) -> RecordType:
@@ -267,11 +280,8 @@ class Database(Generic[Key, RecordType]):
             for record in records
         ]
 
-    def update(self, key: str, updates: dict) -> RecordType:
-        """Updates a Record.
-
-        Note: The returned Record may have to fetch back the updated data
-        """
+    def update(self, key: str, updates: dict) -> None:
+        """Updates a Record in the database. Local representations of it might become outdated."""
         key = transform_identifier(key)
 
         updates = self.encode_entry(updates)
@@ -285,4 +295,3 @@ class Database(Generic[Key, RecordType]):
                 raise KeyNotFound(reason)
             else:
                 raise
-        return self.load_record(key, self, None)

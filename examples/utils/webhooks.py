@@ -7,14 +7,14 @@ from deta_discord_interactions import Autocomplete, Option, Choice
 
 from deta_discord_interactions.enums import PERMISSION
 
-from deta_discord_interactions.utils.database import Database
+from deta_discord_interactions.utils.database import Database, AutoSyncRecord
 from deta_discord_interactions.utils.database import Query, Field
 
 from deta_discord_interactions.utils.oauth import OAuthToken, Webhook
 from deta_discord_interactions.utils.oauth import create_webhook
 
 
-database = Database(name="webhooks")
+database = Database(name="webhooks", record_type=AutoSyncRecord)
 
 blueprint = DiscordInteractionsBlueprint()
 

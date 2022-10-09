@@ -1,8 +1,9 @@
 "Deals with OAuth2, creating and saving Webhooks"
 import json
 import os
-from typing import Callable, NoReturn
+from typing import Callable, NoReturn, Optional, Protocol
 from urllib.parse import quote, unquote
+from dataclasses import dataclass
 
 import requests
 from deta_discord_interactions.models.component import ActionRow, Button, ButtonStyles
@@ -12,19 +13,31 @@ from deta_discord_interactions.models.message import Message
 from deta_discord_interactions.discord import DiscordInteractions
 from deta_discord_interactions.context import Context
 
-from deta_discord_interactions.utils.database import Database
+from deta_discord_interactions.utils.database import Database, Record
 from deta_discord_interactions.utils.oauth.model import OAuthToken, PendingOAuth
 
 
 DISCORD_BASE_URL = 'https://discord.com/api/v10'
 DEFAULT_MICRO_PATH = "https://{MICRO}.deta.dev"
 
-pending_oauths = Database(name="_discord_interactions_pending_oauths")
+
+@dataclass
+class PendingRecord(Record):
+    redirect_uri: str = None
+    pending_oauth: PendingOAuth = None
+
+
+pending_oauths = Database(name="_discord_interactions_pending_oauths", record_type=PendingRecord)
 
 
 def enable_oauth(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
     "Allows for the app to receive and process OAuth and create Webhooks"
     app.route(path)(_handle_oauth)
+
+
+class Callback(Protocol):
+    "Just to make it easier to identifity the signature the callback must have"
+    def __call__(self, token: Optional[OAuthToken], ctx: Context, *args, **kwargs) -> str: ...
 
 
 def request_oauth(
@@ -35,7 +48,7 @@ def request_oauth(
     domain: str = DEFAULT_MICRO_PATH,
     path: str = "/oauth",
     scope: str,
-    callback: Callable,
+    callback: Callback,
     args: list = [],
     kwargs: dict = {},
     message_content: str = "Use the button to register with OAuth",
@@ -64,6 +77,8 @@ def request_oauth(
         OAuth scopes to request, separated by spaces.
     callback : Callable
         Must be a normal function, not a lambda, partial nor a class method.
+        Args passed: (token or None, ctx, *args, **kwargs). 
+        If the user refuses the consent form, passes None instead of an OAuthToken
     args : tuple|list
     kwargs : dict
         Arguments and Keyword arguments to be passed onto callback
@@ -92,9 +107,7 @@ def request_oauth(
         )
     )
 
-    with pending_oauths[internal_id] as record:
-        record["pending_oauth"] = promise
-        record["redirect_uri"] = redirect_uri
+    pending_oauths[internal_id] = PendingRecord(redirect_uri, promise)
 
     link = (
         f"{DISCORD_BASE_URL}/oauth2/authorize?"
@@ -127,7 +140,7 @@ def create_webhook(
     domain: str = DEFAULT_MICRO_PATH,
     path: str = "/oauth",
     *,
-    callback: Callable,
+    callback: Callback,
     args: list = [],
     kwargs: dict = {},
     message_content: str = "Use the button to register the Webhook",
@@ -152,6 +165,8 @@ def create_webhook(
         Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
     callback : Callable
         Must be a normal function, not a lambda, partial nor a class method.
+        Args passed: (token or None, ctx, *args, **kwargs). 
+        If the user refuses the consent form, passes None instead of an OAuthToken
     args : tuple|list
     kwargs : dict
         Arguments and Keyword arguments to be passed onto callback.
@@ -196,9 +211,13 @@ def _handle_oauth(
 
     try:
 
-        with pending_oauths[state] as record:
-            redirect_uri: str = record["redirect_uri"]
-            pending_oauth: PendingOAuth = record["pending_oauth"]
+        record = pending_oauths.get(state)
+
+        if record is None:
+            abort(400, "State not found")
+
+        redirect_uri: str = record["redirect_uri"]
+        pending_oauth: PendingOAuth = record["pending_oauth"]
 
         del pending_oauths[state]
 
