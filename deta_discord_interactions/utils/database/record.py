@@ -87,7 +87,11 @@ class AutoSyncRecord(Record):
 
     def sync_fields(self, *, force: bool = False) -> None:
         if (self._data is None) or force:
-            self._data = self._database.get(self._key)._data
+            record = self._database.get(self._key)
+            if record is None:
+                self._data = {}
+            else:
+                self._data = record._data
 
     def convert_value(self, field: str, value: Any) -> Any:
         if isinstance(value, list):

@@ -336,7 +336,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             self.discord_token = self.fetch_token()
         return {"Authorization": f"Bearer {self.discord_token['access_token']}"}
 
-    def update_commands(self, guild_id: str = None):
+    def update_commands(self, guild_id: str = None, *, from_inside_a_micro: bool = False):
         """
         Update the list of commands registered with Discord.
         This method will overwrite all existing commands.
@@ -346,8 +346,12 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         guild_id: str
             The ID of the Discord guild to register commands to. If omitted,
             the commands are registered globally.
+        from_inside_a_micro: bool
+            If you really want to update the commands from inside the micro, set this to True.
+            I would strongly advise against it though - at least, do not run this *every time* but from a specific command or route
         """
-        if os.getenv("DETA_RUNTIME") is not None:  # It *would* work, it's just a big waste and may slow down the bot overall
+        # It *would* work, it's just a big waste and may slow down the bot overall
+        if (os.getenv("DETA_RUNTIME") is not None) and (from_inside_a_micro == False):
             raise Exception("Cannot register commands from inside a Deta Micro")
 
         if guild_id:
