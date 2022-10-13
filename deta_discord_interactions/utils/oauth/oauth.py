@@ -18,7 +18,8 @@ from deta_discord_interactions.utils.oauth.model import OAuthToken, PendingOAuth
 
 
 DISCORD_BASE_URL = 'https://discord.com/api/v10'
-DEFAULT_MICRO_PATH = "https://{MICRO}.deta.dev"
+DEFAULT_MICRO_PATH = "https://{DETA_PATH}.deta.dev"
+DEFAULT_SPACE_PATH = "https://{DETA_SPACE_APP_HOSTNAME}"
 
 
 @dataclass
@@ -45,7 +46,7 @@ def request_oauth(
     /,
     internal_id: str,
     *,
-    domain: str = DEFAULT_MICRO_PATH,
+    domain: Optional[str] = None,
     path: str = "/oauth",
     scope: str,
     callback: Callback,
@@ -67,12 +68,17 @@ def request_oauth(
         The Context this function is being called from
     internal_id : str
         ID to be used internally. Will be shown in the link.. Will be shown in the link.
-    domain : str, default https://{MICRO}.deta.dev
+    domain : str, default automatic based on where it's being hosted by Deta
         Base URL for the Micro running the bot
-        {MICRO} is filled automatically from the environment variables
+        If it's in Deta Space,
+            - defaults to "https://{DETA_SPACE_APP_HOSTNAME}"
+            - {DETA_SPACE_APP_HOSTNAME} is filled automatically from the environment variables
+        If it's in a Micro outside of Space:
+            - defaults to "https://{DETA_PATH}.deta.dev"
+            - {DETA_PATH} is filled automatically from the environment variables
     path : str, default '/oauth'
         Path that the user will be sent back to. 
-        Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
+        Must match what has been passed to `enable_webhooks` and be set on the Discord Developer Portal
     scope : str
         OAuth scopes to request, separated by spaces.
     callback : Callable
@@ -100,9 +106,13 @@ def request_oauth(
         args,
         kwargs,
     )
+    if domain is None and os.getenv("DETA_SPACE"):
+        domain = DEFAULT_SPACE_PATH
+    elif domain is None and os.getenv("DETA_RUNTIME"):
+        domain = DEFAULT_MICRO_PATH
     redirect_uri = (
         quote(
-            domain.format(MICRO = os.getenv("DETA_PATH")) + path,
+            domain.format(DETA_PATH = os.getenv("DETA_PATH"), DETA_SPACE_APP_HOSTNAME = os.getenv("DETA_SPACE_APP_HOSTNAME")) + path,
             safe=''
         )
     )
@@ -137,7 +147,7 @@ def create_webhook(
     ctx: Context,
     /,
     internal_id: str,
-    domain: str = DEFAULT_MICRO_PATH,
+    domain: Optional[str] = None,
     path: str = "/oauth",
     *,
     callback: Callback,
@@ -157,9 +167,14 @@ def create_webhook(
         The Context this function is being called from
     internal_id : str
         ID to be used internally. Will be shown in the link.
-    domain : str, default https://{MICRO}.deta.dev
--        Base URL for the Micro running the bot
-        {MICRO} is filled automatically from the environment variables
+    domain : str, default automatic based on where it's being hosted by Deta
+        Base URL for the Micro running the bot
+        If it's in Deta Space,
+            - defaults to "https://{DETA_SPACE_APP_HOSTNAME}"
+            - {DETA_SPACE_APP_HOSTNAME} is filled automatically from the environment variables
+        If it's in a Micro outside of Space:
+            - defaults to "https://{DETA_PATH}.deta.dev"
+            - {DETA_PATH} is filled automatically from the environment variables
     path : str, default '/oauth'
         Path that the user will be sent back to. 
         Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
