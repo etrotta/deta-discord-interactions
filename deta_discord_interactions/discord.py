@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Callable, Dict, List, NoReturn
+from typing import Callable, Dict, List, NoReturn, Optional
 import json
 
 import requests
@@ -269,9 +269,10 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
     """
     DISCORD_BASE_URL = "https://discord.com/api/v10"
 
-    def __init__(self):
+    def __init__(self, *, interactions_path: Optional[str] = None):
         super().__init__()
         self.discord_token = None
+        self.interactions_path = interactions_path or os.getenv("DISCORD_INTERACTIONS_PATH", "discord")
         try:
             self.discord_client_id = os.environ["DISCORD_CLIENT_ID"]
             self.discord_public_key = os.environ["DISCORD_PUBLIC_KEY"]
@@ -693,7 +694,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             else:
                 data["query_dict"] = {}
 
-            if data['path'] == '/discord':
+            if data['path'].removeprefix('/') == self.interactions_path.removeprefix('/'):
                 result = self.handle_interaction(data)
                 response, mimetype = result.encode()
                 status = "200 OK"
@@ -706,7 +707,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
                 and "Discord-Interactions" in data.get("HTTP_USER_AGENT")
                 and self.verify_signature(data)
             ):
-                raise Exception("Please set the path to `.../discord` on the Developer Portal, not just the Micro URL")
+                raise Exception(f"Please set the path to `.../{self.interactions_path.removeprefix('/')}` on the Developer Portal, not just the Micro URL")
             elif data['path'] not in self.__routes:
                 self.abort(404, 'Page not found')
             else:
