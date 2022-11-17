@@ -583,11 +583,23 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
     def run_tasks(self, event):
         """Runs all registered Tasks. 
-        If there are more than one registerd tasks, they may run asynchronously and out of order."""
+        If there are more than one registerd tasks, they may run asynchronously and out of order.
+        You can set the CRON_ERROR_WEBHOOK_ID & CRON_ERROR_WEBHOOK_TOKEN environment variables if you want to get notified via Discord when they error."""
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor() as executor:
-            for task in self.tasks:
-                executor.submit(task)
+            tasks = [executor.submit(task) for task in self.tasks]
+            exceptions = [exc for task in tasks if (exc := task.exception()) is not None]
+
+        if exceptions:
+            env_token_id = os.getenv("CRON_ERROR_WEBHOOK_ID")
+            env_token_secret = os.getenv("CRON_ERROR_WEBHOOK_TOKEN")
+            if env_token_id and env_token_secret:
+                from deta_discord_interactions.utils.oauth.model import Webhook
+                Webhook(id=env_token_id, token=env_token_secret, name=None, avatar=None).send(f"Errors on Deta CRON tasks: {exceptions}")
+
+            if len(exceptions) == 1:
+                raise Exception("An exception was raised by a CRON Task") from exceptions[0]
+            raise Exception("Two or more exception were raised by tasks, ", exceptions)
 
 
     def verify_signature(self, request):
