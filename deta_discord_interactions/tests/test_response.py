@@ -94,5 +94,5 @@ def test_dump_followup():
     }
 
     result, mimetype = resp.encode(followup=True)
-    assert json.loads(result) == expected
+    assert json.loads(result.decode("UTF-8")) == expected
     assert mimetype == "application/json"

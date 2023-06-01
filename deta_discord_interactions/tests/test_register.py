@@ -1,16 +1,8 @@
-from flask import Flask
-
+"""Not sure if particularly useful without any asserts, but at least checks that no exceptions are raised while creating and dumping stuff."""
 from deta_discord_interactions import DiscordInteractions
 from deta_discord_interactions.context import ApplicationCommandType
 
-
-def test_register_command():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_command(discord: DiscordInteractions):
     @discord.command()
     def ping(ctx):
         return "pong"
@@ -18,57 +10,39 @@ def test_register_command():
     discord.update_commands()
 
 
-def test_register_user_command():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_user_command(discord: DiscordInteractions):
     @discord.command(type=ApplicationCommandType.USER)
     def ping(ctx):
         return "pong"
 
     @discord.command(type=ApplicationCommandType.USER)
-    def PING(ctx):
+    def ping2(ctx):
         return "pong"
 
     @discord.command(name="user test", type=ApplicationCommandType.USER)
-    def ping(ctx):
+    def ping3(ctx):
         return "pong"
 
     discord.update_commands()
 
 
-def test_register_message_command():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_message_command(discord: DiscordInteractions):
     @discord.command(type=ApplicationCommandType.MESSAGE)
     def ping(ctx):
         return "pong"
 
     @discord.command(type=ApplicationCommandType.MESSAGE)
-    def PING(ctx):
+    def ping2(ctx):
         return "pong"
 
     @discord.command(name="user test", type=ApplicationCommandType.MESSAGE)
-    def ping(ctx):
+    def ping3(ctx):
         return "pong"
 
     discord.update_commands()
 
 
-def test_register_subcommand():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_subcommand(discord: DiscordInteractions):
     group = discord.command_group("group")
 
     @group.command()
@@ -78,13 +52,7 @@ def test_register_subcommand():
     discord.update_commands()
 
 
-def test_register_options():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_options(discord: DiscordInteractions):
     @discord.command()
     def ping(ctx, option1: str, option2: float, option3: str = ""):
         return f"pong"
@@ -92,13 +60,7 @@ def test_register_options():
     discord.update_commands()
 
 
-def test_register_subcommand_options():
-    app = Flask(__name__)
-    app.config["DONT_VALIDATE_SIGNATURE"] = True
-    app.config["DONT_REGISTER_WITH_DISCORD"] = True
-
-    discord = DiscordInteractions(app)
-
+def test_register_subcommand_options(discord: DiscordInteractions):
     group = discord.command_group("group")
 
     @group.command()

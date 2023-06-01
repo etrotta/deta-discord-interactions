@@ -46,7 +46,7 @@ class AutocompleteResult:
 
         Returns
         -------
-        str
+        bytes
             The encoded JSON object.
         str
             The mimetype of the response (``application/json``).
@@ -56,7 +56,7 @@ class AutocompleteResult:
             "data": {"choices": self.choices},
         }
 
-        return json.dumps(data), "application/json"
+        return json.dumps(data).encode("UTF-8"), "application/json"
 
     @classmethod
     def from_return_value(cls, value: Union[dict, list, "AutocompleteResult"]):

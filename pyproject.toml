@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "deta-discord-interactions"
-version = "0.0.4"
+version = "0.1.0"
 authors = [
   { name="etrotta", email="etrotta@duck.com" },
 ]
@@ -12,6 +12,7 @@ description = "A web framework for Discord interactions specialized for usage in
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.9"
+dependencies = ['requests', 'PyNaCl', 'requests-toolbelt', 'deta']
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

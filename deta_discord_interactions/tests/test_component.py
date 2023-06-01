@@ -13,12 +13,12 @@ from deta_discord_interactions import (
 
 
 def test_parse_arguments(discord, client):
-    @discord.custom_handler()
+    @discord.custom_handler('test_handler')
     def handler(ctx, string_arg, int_arg: int):
         return f"String: {string_arg}, type(int_arg): {type(int_arg)}"
 
     assert (
-        client.run_handler(handler, "hello!", "42").content
+        client.run_handler('test_handler', "hello!", "42").content
         == "String: hello!, type(int_arg): <class 'int'>"
     )
 

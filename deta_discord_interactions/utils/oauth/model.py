@@ -1,7 +1,6 @@
 import os
-import importlib
 import datetime
-from typing import Optional
+from typing import Callable, Optional
 from dataclasses import dataclass
 
 import requests
@@ -104,16 +103,9 @@ class OAuthToken(LoadableDataclass):
 class PendingOAuth(LoadableDataclass):
     "A 'promise' of an OAuth process yet to be confirmed"
     ctx: Context
-    callback_module: str
-    callback_name: str
+    callback: Callable
     callback_args: list
     callback_kwargs: dict
-
-    @property
-    def callback(self):
-        module = importlib.import_module(self.callback_module)
-        function = getattr(module, self.callback_name)
-        return function
 
     def execute_callback(self, oauth_token: Optional[OAuthToken]):
         "Executes the callback when the user finishes or cancels the OAuth process"
@@ -191,7 +183,7 @@ class Webhook(LoadableDataclass):
 
         response = requests.post(
             self.url,
-            data=encoded.encode("UTF-8"),
+            data=encoded,
             headers={"Content-Type": mimetype},
             params={"wait": wait_param}
         )

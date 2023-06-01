@@ -1,4 +1,6 @@
 import dataclasses
+from datetime import datetime
+from typing import Optional
 
 from deta_discord_interactions.models.utils import LoadableDataclass
 
@@ -59,7 +61,7 @@ class User(LoadableDataclass):
     email: str = None  # Only available via OAuth with email scope
     flags: int = None
     premium_type: int = None
-    public_flags: int = None
+    public_flags: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data):
@@ -125,20 +127,29 @@ class Member(User):
         Whether the user has been server muted.
     pending
         Whether the user has passed the membership requirements of a guild.
+    communication_disabled_until
+        Timestamp when the member's timeout will expire (if existing)
     """
 
-    nick: str = None
-    roles: list = None
-    joined_at: str = None
-    premium_since: str = None
-    permissions: int = None
-    deaf: bool = None
-    mute: bool = None
-    pending: bool = None
+    pending: Optional[bool] = None
+    nick: Optional[str] = None
+    roles: Optional[list[str]] = None
+    permissions: Optional[int] = None
+    deaf: bool = False
+    mute: bool = False
+    joined_at: datetime = None
+    premium_since: Optional[datetime] = None
+    communication_disabled_until: Optional[datetime] = None
 
     def __post_init__(self):
         if isinstance(self.permissions, str):
             self.permissions = int(self.permissions)
+        if isinstance(self.joined_at, str):
+            self.joined_at = datetime.fromisoformat(self.joined_at)
+        if isinstance(self.premium_since, str):
+            self.premium_since = datetime.fromisoformat(self.premium_since)
+        if isinstance(self.communication_disabled_until, str):
+            self.communication_disabled_until = datetime.fromisoformat(self.communication_disabled_until)
 
     @property
     def display_name(self):

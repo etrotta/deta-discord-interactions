@@ -1,7 +1,7 @@
 import json
 
 from dataclasses import dataclass
-from typing import List, Union
+from typing import Union
 
 from deta_discord_interactions.models.utils import LoadableDataclass
 from deta_discord_interactions.models.component import Component, ComponentType
@@ -26,7 +26,7 @@ class Modal(LoadableDataclass):
 
     custom_id: Union[str, list] = None
     title: str = None
-    components: List[Component] = None
+    components: list[Component] = None
 
     def __post_init__(self):
         # Verify Custom ID
@@ -63,7 +63,7 @@ class Modal(LoadableDataclass):
 
         Returns
         -------
-        List[dict]
+        list[dict]
             The message components as a list of dicts.
         """
         return [c.dump() for c in self.components]
@@ -94,4 +94,4 @@ class Modal(LoadableDataclass):
             },
         }
 
-        return (json.dumps(payload), "application/json")
+        return (json.dumps(payload).encode("UTF-8"), "application/json")

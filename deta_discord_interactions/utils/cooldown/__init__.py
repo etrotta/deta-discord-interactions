@@ -6,10 +6,10 @@ from deta_discord_interactions.models.message import Message
 
 from deta_discord_interactions.context import Context
 
-from deta_discord_interactions.utils.database import Database, Record
+from deta_discord_interactions.utils.database import Database, LoadableDataclass
 
 @dataclasses.dataclass
-class CooldownRecord(Record):
+class CooldownRecord(LoadableDataclass):
     # command_name: str
     # bucket_type: str
     # cooldown_identifier: str
@@ -65,7 +65,7 @@ def cooldown(
                 msg = cooldown_message.format(cd_type_detail=cd_detail, expire_timestamp=record.expire_timestamp)
                 return Message(msg, ephemeral=True)
 
-            database[key] = CooldownRecord(now + duration)
+            database.put(key, CooldownRecord(now + duration), expire_in=duration)
 
             return function(ctx, *args, **kwargs)
         return wrapper

@@ -1,6 +1,6 @@
 import os
 import time
-from typing import Callable, Dict, List, NoReturn, Optional
+from typing import Callable, NoReturn
 import json
 
 import requests
@@ -21,7 +21,7 @@ class AbortError(Exception):
 
 class PongResponse:
     def encode(self):
-        return json.dumps({"type": ResponseType.PONG}), "application/json"
+        return json.dumps({"type": ResponseType.PONG}).encode('UTF-8'), "application/json"
 
 
 class InteractionType:
@@ -42,7 +42,7 @@ class DiscordInteractionsBlueprint:
     def __init__(self):
         self.discord_commands: dict[str, Command] = {}
         self.custom_id_handlers: dict[str, Callable] = {}
-        self.tasks: list[Callable] = []
+        self.deta_actions: dict[str, Callable] = {}
 
     def add_command(
         self,
@@ -50,13 +50,13 @@ class DiscordInteractionsBlueprint:
         name: str = None,
         description: str = None,
         *,
-        options: List[Option] = None,
-        annotations: Dict[str, str] = None,
+        options: list[Option] = None,
+        annotations: dict[str, str] = None,
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
         dm_permission: bool = None,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
     ):
         """
         Create and add a new :class:`ApplicationCommand`.
@@ -67,16 +67,16 @@ class DiscordInteractionsBlueprint:
             Function to execute when the command is run.
         name: str
             The name of the command, as displayed in the Discord client.
-        name_localizations: Dict[str, str]
+        name_localizations: dict[str, str]
             A dictionary of localizations for the name of the command.
         description: str
             The description of the command.
-        description_localizations: Dict[str, str]
+        description_localizations: dict[str, str]
             A dictionary of localizations for the description of the command.
-        options: List[Option]
+        options: list[Option]
             A list of options for the command, overriding the function's
             keyword arguments.
-        annotations: Dict[str, str]
+        annotations: dict[str, str]
             If ``options`` is not provided, descriptions for each of the
             options defined in the function's keyword arguments.
         type: int
@@ -107,13 +107,13 @@ class DiscordInteractionsBlueprint:
         name: str = None,
         description: str = None,
         *,
-        options: List[Option] = None,
-        annotations: Dict[str, str] = None,
+        options: list[Option] = None,
+        annotations: dict[str, str] = None,
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
         dm_permission: bool = None,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
     ) -> Callable[[Callable], Command]:
         """
         Decorator to create a new :class:`Command`.
@@ -122,16 +122,16 @@ class DiscordInteractionsBlueprint:
         ----------
         name: str
             The name of the command, as displayed in the Discord client.
-        name_localizations: Dict[str, str]
+        name_localizations: dict[str, str]
             A dictionary of localizations for the name of the command.
         description: str
             The description of the command.
-        description_localizations: Dict[str, str]
+        description_localizations: dict[str, str]
             A dictionary of localizations for the description of the command.
-        options: List[Option]
+        options: list[Option]
             A list of options for the command, overriding the function's
             keyword arguments.
-        annotations: Dict[str, str]
+        annotations: dict[str, str]
             If ``options`` is not provided, descriptions for each of the
             options defined in the function's keyword arguments.
         type: int
@@ -164,13 +164,13 @@ class DiscordInteractionsBlueprint:
 
         return decorator
 
-    def task(self):
+    def action(self, action_id: str):
         """
-        Decorator to add a new Task.
-        The Micro must be set to run on CRON for them to run at all.
+        Decorator to add a new Deta (Scheduled) Action.
+        You must remember to register it in the Spacefile for it to run.
         """
         def decorator(func):
-            self.tasks.append(func)
+            self.deta_actions[action_id] = func
             return func
         return decorator
 
@@ -181,8 +181,8 @@ class DiscordInteractionsBlueprint:
         *,
         default_member_permissions: int = None,
         dm_permission: bool = None,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
     ):
         """
         Create a new :class:`SlashCommandGroup`
@@ -192,11 +192,11 @@ class DiscordInteractionsBlueprint:
         ----------
         name: str
             The name of the command group, as displayed in the Discord client.
-        name_localizations: Dict[str, str]
+        name_localizations: dict[str, str]
             A dictionary of localizations for the name of the command group.
         description: str
             The description of the command group.
-        description_localizations: Dict[str, str]
+        description_localizations: dict[str, str]
             A dictionary of localizations for the description of the command group.
         default_member_permissions: int
             A permission integer defining the required permissions a user must have to run the command
@@ -269,10 +269,9 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
     """
     DISCORD_BASE_URL = "https://discord.com/api/v10"
 
-    def __init__(self, *, interactions_path: Optional[str] = None):
+    def __init__(self):
         super().__init__()
         self.discord_token = None
-        self.interactions_path = interactions_path or os.getenv("DISCORD_INTERACTIONS_PATH", "discord")
         try:
             self.discord_client_id = os.environ["DISCORD_CLIENT_ID"]
             self.discord_public_key = os.environ["DISCORD_PUBLIC_KEY"]
@@ -283,9 +282,6 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         except KeyError:
             raise Exception("Please fill in the .env files with your application's credentials.")
         self.__routes = {}
-        # For Deta Micro CRON
-        self._deta_type = "probably_wsgi"
-        self.lib = self.run_tasks
 
     def fetch_token(self):
         """
@@ -329,10 +325,9 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         Returns
         -------
-        Dict[str, str]
+        dict[str, str]
             The Authorization header.
         """
-
         if self.discord_token is None or time.time() > self.discord_token["expires_on"]:
             self.discord_token = self.fetch_token()
         return {"Authorization": f"Bearer {self.discord_token['access_token']}"}
@@ -352,7 +347,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             I would strongly advise against it though - at least, do not run this *every time* but from a specific command or route
         """
         # It *would* work, it's just a big waste and may slow down the bot overall
-        if (os.getenv("DETA_RUNTIME") is not None) and (from_inside_a_micro == False):
+        if (os.getenv("DETA_SPACE_APP") is not None) and (from_inside_a_micro == False):
             raise Exception("Cannot register commands from inside a Deta Micro")
 
         if guild_id:
@@ -434,7 +429,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         Returns
         -------
-        List[Permission]
+        list[Permission]
             A list of permission overwrites for the given command.
         """
 
@@ -454,7 +449,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
     def set_permission_overwrites(
         self,
-        permissions: List[Permission],
+        permissions: list[Permission],
         command: Command = None,
         *,
         guild_id: str,
@@ -503,7 +498,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
         """
         self.discord_commands.update(blueprint.discord_commands)
         self.custom_id_handlers.update(blueprint.custom_id_handlers)
-        self.tasks.extend(blueprint.tasks)
+        self.deta_actions.update(blueprint.deta_actions)
 
     def run_command(self, data: dict):
         """
@@ -581,26 +576,13 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
 
         return command.make_context_and_run_autocomplete(discord=self, data=data)
 
-    def run_tasks(self, event):
-        """Runs all registered Tasks. 
-        If there are more than one registerd tasks, they may run asynchronously and out of order.
-        You can set the CRON_ERROR_WEBHOOK_ID & CRON_ERROR_WEBHOOK_TOKEN environment variables if you want to get notified via Discord when they error."""
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor() as executor:
-            tasks = [executor.submit(task) for task in self.tasks]
-            exceptions = [exc for task in tasks if (exc := task.exception()) is not None]
-
-        if exceptions:
-            env_token_id = os.getenv("CRON_ERROR_WEBHOOK_ID")
-            env_token_secret = os.getenv("CRON_ERROR_WEBHOOK_TOKEN")
-            if env_token_id and env_token_secret:
-                from deta_discord_interactions.utils.oauth.model import Webhook
-                Webhook(id=env_token_id, token=env_token_secret, name=None, avatar=None).send(f"Errors on Deta CRON tasks: {exceptions}")
-
-            if len(exceptions) == 1:
-                raise Exception("An exception was raised by a CRON Task") from exceptions[0]
-            raise Exception("Two or more exception were raised by tasks, ", exceptions)
-
+    def run_deta_action(self, event: dict[str, str]):
+        """Runs registered Deta Actions"""
+        action = self.deta_actions.get(event.get("id"))
+        if action is None:
+            self.abort(400, f"Deta event tried to run an unregistered action: {event!r}")
+        else:
+            return action(event)
 
     def verify_signature(self, request):
         """
@@ -687,7 +669,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             return function
         return decorator
 
-    def __call__(self, environ, start_response):
+    def __call__(self, environ: dict, start_response: Callable):
         """
         Handles incoming interaction data
         (WSGI)
@@ -699,36 +681,58 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
                 data["json"] = json.loads(raw_data.decode("UTF-8"))
                 data["raw_data"] = raw_data
 
-            data["path"] = data.get("PATH_INFO", '') or '/'
+            data["path"] = data.get("PATH_INFO", '').split("?", 1)[0] or '/'
+
 
             if data["QUERY_STRING"]:
                 data["query_dict"] = dict(args.split('=', 1) for args in data["QUERY_STRING"].split("&"))
             else:
                 data["query_dict"] = {}
-
-            if data['path'].removeprefix('/') == self.interactions_path.removeprefix('/'):
+            ### Handle Discord
+            if data['path'] == '/discord':
                 result = self.handle_interaction(data)
                 response, mimetype = result.encode()
                 status = "200 OK"
                 response_headers = [("Content-Type", mimetype)]
                 start_response(status, response_headers)
-                return [response.encode("UTF-8")]
-            elif (  # If you set it like `https://example.deta.dev` instead of `https://example.deta.dev/discord`
+                return [response]
+            ### Catch a common mistake
+            elif (  # If you set it like `https://example.deta.app` instead of `https://example.deta.app/discord`
                 data['path'] == '/' 
                 and '/' not in self.__routes 
                 and "Discord-Interactions" in data.get("HTTP_USER_AGENT")
                 and self.verify_signature(data)
             ):
-                raise Exception(f"Please set the path to `.../{self.interactions_path.removeprefix('/')}` on the Developer Portal, not just the Micro URL")
-            elif data['path'] not in self.__routes:
-                self.abort(404, 'Page not found')
-            else:
+                raise Exception("Please set the path to `.../discord` on the Developer Portal, not just the Micro URL")
+            ### Deta special routes
+            elif data['path'] == "/__space/v0/actions":
+                event = data.get("json", {}).get("event")
+                if event is None:
+                    self.abort(400, 'Malformated deta space event')
+                result = self.run_deta_action(event)
+                if result:
+                    start_response("200 OK", [("Content-Type", "application/json")])
+                    return [json.dumps({"result": result}).encode("UTF-8")]
+                else:
+                    start_response('200 OK', [])
+                    return []
+            ### User defined routes (including Utils such as oauth)
+            elif data['path'] in self.__routes:
                 return self.__routes[data['path']](data, start_response, self.abort)
+            ### Unexpected route
+            else:
+                self.abort(404, 'Page not found')
         except AbortError as err:
             status = err.http_code
             response_headers = [("Content-Type", "application/json")]
             start_response(status, response_headers)
             return [json.dumps({"error": status}).encode("UTF-8")]
+        except Exception as err:
+            import traceback
+            traceback.print_exc()
+            print(f"Unexpected error: {err}", flush=True)
+            start_response('500 Internal Server Error', [("Content-Type", "application/json")])
+            return [json.dumps({"error": str(type(err))}).encode("UTF-8")]
 
     def abort(self, code: int, reason: str) -> NoReturn:
         raise AbortError(f"{code} {reason}")

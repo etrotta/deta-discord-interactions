@@ -3,7 +3,7 @@ import enum
 import inspect
 import itertools
 
-from typing import Callable, List, Dict, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 from deta_discord_interactions.context import Context
 from deta_discord_interactions.models import (
@@ -38,20 +38,20 @@ class Command:
     name: str
         Name for this command (appears in the Discord client). If omitted,
         infers the name based on the name of the function.
-    name_localizations: Dict[str, str]
+    name_localizations: dict[str, str]
         Localization dictionary for name field.
     description: str
         Description for this command (appears in the Discord client). If
         omitted, infers the description based on the docstring of the function,
         or sets the description to "No description", if ``ApplicationCommandType``
         is ``CHAT_INPUT``, else set description to ``None``.
-    description_localizations: Dict[str, str]
+    description_localizations: dict[str, str]
         Localization dictionary for description field.
-    options: List[Option]
+    options: list[Option]
         Array of options that can be passed to this command. If omitted,
         infers the options based on the function parameters and type
         annotations.
-    annotations: Dict[str, str]
+    annotations: dict[str, str]
         Dictionary of descriptions for each option provided. Use this only if
         you want the options to be inferred from the parameters and type
         annotations. Do not use with ``options``. If omitted, and if
@@ -76,13 +76,13 @@ class Command:
         name: str,
         description: str,
         *,
-        options: List[Option],
-        annotations: Dict[str, str],
+        options: list[Option],
+        annotations: dict[str, str],
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
         dm_permission: bool = None,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
         discord: "DiscordInteractions" = None,
         autocomplete_handler: Callable = None,
     ):
@@ -351,11 +351,11 @@ class SlashCommandSubgroup(Command):
     ----------
     name: str
         The name of this subgroup, shown in the Discord client.
-    name_localizations: Dict[str, str]
+    name_localizations: dict[str, str]
         A dict of localized names for this subgroup.
     description: str
         The description of this subgroup, shown in the Discord client.
-    description_localizations: Dict[str, str]
+    description_localizations: dict[str, str]
         A dict of localized descriptions for this subgroup.
     """
 
@@ -364,8 +364,8 @@ class SlashCommandSubgroup(Command):
         name: str,
         description: str,
         *,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
     ):
         self.name = name
         self.description = description
@@ -382,10 +382,10 @@ class SlashCommandSubgroup(Command):
         name: str = None,
         description: str = None,
         *,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
-        options: List[Option] = None,
-        annotations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
+        options: list[Option] = None,
+        annotations: dict[str, str] = None,
     ):
         """
         Decorator to create a new Subcommand of this Subgroup.
@@ -394,16 +394,16 @@ class SlashCommandSubgroup(Command):
         ----------
         name: str
             The name of the command, as displayed in the Discord client.
-        name_localizations: Dict[str, str]
+        name_localizations: dict[str, str]
             A dict of localized names for the command.
         description: str
             The description of the command.
-        description_localizations: Dict[str, str]
+        description_localizations: dict[str, str]
             A dict of localized descriptions for the command.
-        options: List[Option]
+        options: list[Option]
             A list of options for the command, overriding the function's
             keyword arguments.
-        annotations: Dict[str, str]
+        annotations: dict[str, str]
             If ``options`` is not provided, descriptions for each of the
             options defined in the function's keyword arguments.
         """
@@ -431,7 +431,7 @@ class SlashCommandSubgroup(Command):
 
         Returns
         -------
-        List[Option]
+        list[Option]
             The options for this command.
         """
         options = []
@@ -484,11 +484,11 @@ class SlashCommandGroup(SlashCommandSubgroup):
     ----------
     name: str
         The name of this subgroup, shown in the Discord client.
-    name_localizations: Dict[str, str]
+    name_localizations: dict[str, str]
         A dict of localized names for this subgroup.
     description: str
         The description of this subgroup, shown in the Discord client.
-    description_localizations: Dict[str, str]
+    description_localizations: dict[str, str]
         A dict of localized descriptions for this subgroup.
     default_member_permissions: int
         Permission integer setting permission defaults for a command
@@ -521,8 +521,8 @@ class SlashCommandGroup(SlashCommandSubgroup):
         name: str,
         description: str = "No description",
         *,
-        name_localizations: Dict[str, str] = None,
-        description_localizations: Dict[str, str] = None,
+        name_localizations: dict[str, str] = None,
+        description_localizations: dict[str, str] = None,
     ):
         """
         Create a new :class:`SlashCommandSubroup`
@@ -532,11 +532,11 @@ class SlashCommandGroup(SlashCommandSubgroup):
         ----------
         name: str
             The name of the subgroup, as displayed in the Discord client.
-        name_localizations: Dict[str, str]
+        name_localizations: dict[str, str]
             A dict of localized names for the subgroup.
         description: str
             The description of the subgroup. Defaults to "No description".
-        description_localizations: Dict[str, str]
+        description_localizations: dict[str, str]
             A dict of localized descriptions for the subgroup.
         """
 
