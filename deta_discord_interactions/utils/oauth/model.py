@@ -42,11 +42,28 @@ class OAuthInfo(LoadableDataclass):
 @dataclass
 class OAuthToken(LoadableDataclass):
     access_token: str
-    refresh_token: str
     scope: str
     expires_in: int
+    refresh_token: str = None  # Not present in client credential grants
     webhook: 'Webhook' = None
     expire_date: datetime.datetime = None
+
+    @classmethod
+    def from_client_credentials(cls, scope: str = "identify connections"):
+        "Generate an OAuth Access Token from the environment variables client credentials"
+        # https://discord.com/developers/docs/topics/oauth2#client-credentials-grant
+        response = requests.post(
+            'https://discord.com/api/v10/oauth2/token',
+            data={
+                'grant_type': 'client_credentials',
+                'scope': scope,
+            },
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
+            auth=(os.getenv("DISCORD_CLIENT_ID"), os.getenv("DISCORD_CLIENT_SECRET"))
+        )
+        response.raise_for_status()
+        return cls.from_dict(response.json())
+
 
     def __post_init__(self):
         if isinstance(self.expires_in, int) and self.expire_date is None:
@@ -59,7 +76,7 @@ class OAuthToken(LoadableDataclass):
         headers = {
             "Authorization": f"Bearer {self.access_token}"
         }
-        response = requests.get(f'https://discord.com/api/v10/oauth2/@me', headers=headers)
+        response = requests.get('https://discord.com/api/v10/oauth2/@me', headers=headers)
         response.raise_for_status()
         return OAuthInfo.from_dict(response.json())
 
@@ -68,7 +85,7 @@ class OAuthToken(LoadableDataclass):
         headers = {
             "Authorization": f"Bearer {self.access_token}"
         }
-        response = requests.get(f'https://discord.com/api/v10/users/@me', headers=headers)
+        response = requests.get('https://discord.com/api/v10/users/@me', headers=headers)
         response.raise_for_status()
         return User.from_dict(response.json())
 

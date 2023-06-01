@@ -94,9 +94,6 @@ class Message(LoadableDataclass):
         if self.file:
             self.files = [self.file]
 
-        if self.ephemeral and self.files:
-            raise ValueError("Ephemeral Messages cannot include files.")
-
         if self.embeds:
             for i, embed in enumerate(self.embeds):
                 if not dataclasses.is_dataclass(embed):
