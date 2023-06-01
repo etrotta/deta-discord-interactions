@@ -1,5 +1,5 @@
 from dataclasses import dataclass, asdict
-from typing import List, Union
+from typing import Optional, Union
 
 
 class ComponentType:
@@ -46,12 +46,12 @@ class CustomIdComponent(Component):
 
     Parameters
     ----------
-    custom_id: str | List
+    custom_id: str | list
         The custom ID of the component. Strings represent a single ID, lists
         take advantage of newlines to store state alongside the ID.
     """
 
-    custom_id: Union[str, List] = None
+    custom_id: Union[str, list] = None
 
     def __post_init__(self):
         if isinstance(self.custom_id, list) or isinstance(self.custom_id, tuple):
@@ -68,14 +68,14 @@ class ActionRow(Component):
 
     Parameters
     ----------
-    components: List[Component]
+    components: list[Component]
         The message components to display in the action row.
         Limited to any of the following:
         - 5 Buttons
         - 1 Select Menu
     """
 
-    components: List[CustomIdComponent] = None
+    components: list[CustomIdComponent] = None
 
     type: int = ComponentType.ACTION_ROW
 
@@ -194,7 +194,7 @@ class SelectMenu(CustomIdComponent):
 
     Parameters
     ----------
-    options: List[SelectMenuOption]
+    options: list[SelectMenuOption]
         The options to display in the select menu.
     placeholder: str
         The placeholder displayed when the select menu is empty.
@@ -208,13 +208,13 @@ class SelectMenu(CustomIdComponent):
         Selected options. Only present when receiving components from a modal.
     """
 
-    options: List[SelectMenuOption] = None
+    options: list[SelectMenuOption] = None
 
     placeholder: str = None
     min_values: int = 1
     max_values: int = 1
     disabled: bool = False
-    values: list = None
+    values: Optional[list] = None
 
     type: int = ComponentType.SELECT_MENU
 

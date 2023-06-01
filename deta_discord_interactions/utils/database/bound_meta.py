@@ -10,7 +10,7 @@ class BoundMeta(type):
             the value returned by that method
             the arguments and keyword arguments passed to that method
         - return the value returned by _sync
-    Note: DO NOT overwrite these methods on your class
+    Note: The 'bound' methods are decorated. Do not further modify them. 
 
     Example Usage:
         class Test(list, metaclass=BoundMeta, bind_methods=['__iadd__', 'append', 'extend']):

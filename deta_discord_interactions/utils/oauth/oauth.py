@@ -13,23 +13,20 @@ from deta_discord_interactions.models.message import Message
 from deta_discord_interactions.discord import DiscordInteractions
 from deta_discord_interactions.context import Context
 
-from deta_discord_interactions.utils.database import Database, Record
+from deta_discord_interactions.utils.database import Database, LoadableDataclass
 from deta_discord_interactions.utils.oauth.model import OAuthToken, PendingOAuth
 
 
 DISCORD_BASE_URL = 'https://discord.com/api/v10'
-DEFAULT_MICRO_PATH = "https://{DETA_PATH}.deta.dev"
-DEFAULT_SPACE_PATH = "https://{DETA_SPACE_APP_HOSTNAME}"
-
 
 @dataclass
-class PendingRecord(Record):
-    redirect_uri: str = None
-    pending_oauth: PendingOAuth = None
+class PendingRecord(LoadableDataclass):
+    redirect_uri: str
+    pending_oauth: PendingOAuth
 
 
 pending_oauths = Database(name="_discord_interactions_pending_oauths", record_type=PendingRecord)
-
+remember_callback = pending_oauths.remember_function
 
 def enable_oauth(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
     "Allows for the app to receive and process OAuth and create Webhooks"
@@ -67,22 +64,17 @@ def request_oauth(
     ctx : Context
         The Context this function is being called from
     internal_id : str
-        ID to be used internally. Will be shown in the link.. Will be shown in the link.
-    domain : str, default automatic based on where it's being hosted by Deta
+        ID to be used internally. Will be shown in the link.
+    domain : str, automatically set
         Base URL for the Micro running the bot
-        If it's in Deta Space,
-            - defaults to "https://{DETA_SPACE_APP_HOSTNAME}"
-            - {DETA_SPACE_APP_HOSTNAME} is filled automatically from the environment variables
-        If it's in a Micro outside of Space:
-            - defaults to "https://{DETA_PATH}.deta.dev"
-            - {DETA_PATH} is filled automatically from the environment variables
+        If not set, uses the `DETA_SPACE_APP_HOSTNAME` environment variable
     path : str, default '/oauth'
         Path that the user will be sent back to. 
         Must match what has been passed to `enable_webhooks` and be set on the Discord Developer Portal
     scope : str
         OAuth scopes to request, separated by spaces.
     callback : Callable
-        Must be a normal function, not a lambda, partial nor a class method.
+        Must have been registered using the `remember_callback` decorator.
         Args passed: (token or None, ctx, *args, **kwargs). 
         If the user refuses the consent form, passes None instead of an OAuthToken
     args : tuple|list
@@ -94,28 +86,22 @@ def request_oauth(
     button_label : str
         The URL Button's label
 
-
     If the user never finishes the authorization process, the callback will not be called
     If they create one , it will be called with ctx, webhook, `args` and `kwargs`
     The link will only work for one authorization
     """
     promise = PendingOAuth(
         ctx,
-        callback.__module__,
-        callback.__name__,
+        callback,
         args,
         kwargs,
     )
-    if domain is None and os.getenv("DETA_SPACE"):
-        domain = DEFAULT_SPACE_PATH
-    elif domain is None and os.getenv("DETA_RUNTIME"):
-        domain = DEFAULT_MICRO_PATH
-    redirect_uri = (
-        quote(
-            domain.format(DETA_PATH = os.getenv("DETA_PATH"), DETA_SPACE_APP_HOSTNAME = os.getenv("DETA_SPACE_APP_HOSTNAME")) + path,
-            safe=''
-        )
-    )
+    if domain is None:
+        if os.getenv("DETA_SPACE_APP"):
+            domain = f"""https://{os.getenv("DETA_SPACE_APP_HOSTNAME")}"""
+        else:
+            raise Exception("Cannot identify which domain to use for OAuth redirection")
+    redirect_uri = quote(domain + path, safe='')
 
     pending_oauths[internal_id] = PendingRecord(redirect_uri, promise)
 
@@ -167,19 +153,15 @@ def create_webhook(
         The Context this function is being called from
     internal_id : str
         ID to be used internally. Will be shown in the link.
-    domain : str, default automatic based on where it's being hosted by Deta
+    domain : str, automatically set
         Base URL for the Micro running the bot
-        If it's in Deta Space,
-            - defaults to "https://{DETA_SPACE_APP_HOSTNAME}"
-            - {DETA_SPACE_APP_HOSTNAME} is filled automatically from the environment variables
-        If it's in a Micro outside of Space:
-            - defaults to "https://{DETA_PATH}.deta.dev"
-            - {DETA_PATH} is filled automatically from the environment variables
+        If not set, uses the `DETA_SPACE_APP_HOSTNAME` environment variable
     path : str, default '/oauth'
         Path that the user will be sent back to. 
-        Must match what has been passed to `enable_webhooks` and be set on the Developer Portal
+        Must match what has been passed to `enable_webhooks` and be set on the Discord Developer Portal
     callback : Callable
         Must be a normal function, not a lambda, partial nor a class method.
+        You must use the `remember_callback` decorator when defining the function
         Args passed: (token or None, ctx, *args, **kwargs). 
         If the user refuses the consent form, passes None instead of an OAuthToken
     args : tuple|list
@@ -190,7 +172,6 @@ def create_webhook(
         Message content, besides the button with the URL
     button_label : str
         The Label of the button
-
 
     If the user never finishes creating a webhook, the callback will not be called
     If they create one , it will be called with ctx, webhook, `args` and `kwargs`
@@ -210,7 +191,6 @@ def create_webhook(
     )
 
 
-
 def _handle_oauth(
     request: dict,
     start_response: Callable[[str, list], None],
@@ -225,14 +205,13 @@ def _handle_oauth(
     url = DISCORD_BASE_URL + "/oauth2/token"
 
     try:
-
         record = pending_oauths.get(state)
 
         if record is None:
             abort(400, "State not found")
 
-        redirect_uri: str = record["redirect_uri"]
-        pending_oauth: PendingOAuth = record["pending_oauth"]
+        redirect_uri: str = record.redirect_uri
+        pending_oauth: PendingOAuth = record.pending_oauth
 
         del pending_oauths[state]
 

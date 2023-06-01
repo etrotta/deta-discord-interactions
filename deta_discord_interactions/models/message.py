@@ -1,6 +1,6 @@
 import dataclasses
 import json
-from typing import List, Union
+from typing import Optional
 from datetime import datetime
 
 import requests_toolbelt
@@ -61,43 +61,43 @@ class Message(LoadableDataclass):
         components.
     """
 
-    content: str = None
+    content: Optional[str] = None
     tts: bool = False
-    embed: Union[Embed, dict] = None
-    embeds: List[Union[Embed, dict]] = None
+    embed: Embed = None
+    embeds: list[Embed] = None
     allowed_mentions: dict = dataclasses.field(
         default_factory=lambda: {"parse": ["roles", "users", "everyone"]}
     )
     deferred: bool = False
     ephemeral: bool = False
     update: bool = False
-    file: tuple = None
-    files: List[tuple] = None
-    components: List[Component] = None
+    file: Optional[tuple] = None
+    files: Optional[list[tuple]] = None
+    components: Optional[list[Component]] = None
 
     # These fields are only set on incoming messages
-    id: str = None
-    channel_id: str = None
-    timestamp: datetime = None
-    edited_timestamp: datetime = None
-    author: Member = None
-    interaction: MessageInteraction = None
+    id: Optional[str] = None
+    channel_id: Optional[str] = None
+    timestamp: Optional[datetime] = None
+    edited_timestamp: Optional[datetime] = None
+    author: Optional[Member] = None
+    interaction: Optional[MessageInteraction] = None
 
     def __post_init__(self):
-        if self.embed is not None and self.embeds is not None:
+        if self.embed and self.embeds:
             raise ValueError("Specify only one of embed or embeds")
-        if self.embed is not None:
+        if self.embed:
             self.embeds = [self.embed]
 
-        if self.file is not None and self.files is not None:
+        if self.file and self.files:
             raise ValueError("Specify only one of file or files")
-        if self.file is not None:
+        if self.file:
             self.files = [self.file]
 
-        if self.ephemeral and self.files is not None:
+        if self.ephemeral and self.files:
             raise ValueError("Ephemeral Messages cannot include files.")
 
-        if self.embeds is not None:
+        if self.embeds:
             for i, embed in enumerate(self.embeds):
                 if not dataclasses.is_dataclass(embed):
                     self.embeds[i] = Embed.from_dict(embed)
@@ -144,7 +144,7 @@ class Message(LoadableDataclass):
 
         Returns
         -------
-        List[dict]
+        list[dict]
             A list of dicts representing the embeds.
         """
         return (
@@ -157,7 +157,7 @@ class Message(LoadableDataclass):
 
         Returns
         -------
-        List[dict]
+        list[dict]
             A list of dicts representing the components.
         """
         return (
@@ -165,7 +165,7 @@ class Message(LoadableDataclass):
         )
 
     @classmethod
-    def from_return_value(cls, result):
+    def from_return_value(cls, result) -> 'Message':
         """
         Convert a function return value into a Message object.
         Converts ``None`` to an empty Message, or any other type to ``str``
@@ -207,8 +207,8 @@ class Message(LoadableDataclass):
 
         Returns
         -------
-        string
-            A string containing the message data (either JSON or multipart).
+        bytes
+            Bytes containing the message data (either JSON or multipart).
         string
             The mimetype of the message data.
         """
@@ -243,6 +243,6 @@ class Message(LoadableDataclass):
                 fields=fields,
             )
 
-            return (multipart.to_string().decode(), multipart.content_type)
+            return (multipart.to_string(), multipart.content_type)
         else:
-            return (payload_json, "application/json")
+            return (payload_json.encode('UTF-8'), "application/json")

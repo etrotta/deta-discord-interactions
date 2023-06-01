@@ -4,7 +4,7 @@ from deta_discord_interactions import Message, ActionRow, Button, ButtonStyles
 def test_basic_handler(discord, client):
     click_count = 0
 
-    @discord.custom_handler()
+    @discord.custom_handler('click_handler')
     def handle_click(ctx):
         nonlocal click_count
         click_count += 1
@@ -16,7 +16,7 @@ def test_basic_handler(discord, client):
                     components=[
                         Button(
                             style=ButtonStyles.PRIMARY,
-                            custom_id=handle_click,
+                            custom_id='click_handler',
                             label="Click Me!",
                         )
                     ]
@@ -46,12 +46,12 @@ def test_basic_handler(discord, client):
         )
 
     client.run("click_counter")
-    discord.custom_id_handlers[handle_click](None)
+    discord.custom_id_handlers['click_handler'](None)
     assert click_count == 1
 
 
 def test_stateful_handler(discord, client):
-    @discord.custom_handler()
+    @discord.custom_handler('click_handler')
     def handle_click(ctx, click_count):
         click_count = int(click_count)
         click_count += 1
@@ -63,7 +63,7 @@ def test_stateful_handler(discord, client):
                     components=[
                         Button(
                             style=ButtonStyles.PRIMARY,
-                            custom_id=[handle_click, click_count],
+                            custom_id=['click_handler', click_count],
                             label="Click Me!",
                         )
                     ]
@@ -84,7 +84,7 @@ def test_stateful_handler(discord, client):
                     components=[
                         Button(
                             style=ButtonStyles.PRIMARY,
-                            custom_id=[handle_click, 0],
+                            custom_id=['click_handler', 0],
                             label="Click Me!",
                         )
                     ]
@@ -93,5 +93,5 @@ def test_stateful_handler(discord, client):
         )
 
     client.run("click_counter")
-    response = discord.custom_id_handlers[handle_click](None, 0)
+    response = discord.custom_id_handlers['click_handler'](None, 0)
     assert response.content == "1 clicks"

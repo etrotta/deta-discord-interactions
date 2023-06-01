@@ -31,7 +31,6 @@ results = database.fetch(query)
 """
 
 from typing import NoReturn
-from deta_discord_interactions.utils.database.adapters import transform_identifier
 
 class Field:
     "Proxy class for setting filters"
@@ -39,13 +38,11 @@ class Field:
         self.attribute = attribute
 
     def __eq__(self, other) -> dict:
-        other = transform_identifier(other, on_unknown='ignore')
         return {
             self.attribute: other
         }
 
     def __ne__(self, other) -> dict:
-        other = transform_identifier(other, on_unknown='ignore')
         return {
             f'{self.attribute}?ne': other
         }
@@ -85,18 +82,15 @@ class Field:
         }
 
     def __contains__(self, other) -> dict:
-        other = transform_identifier(other, on_unknown='ignore')
         return {
             f'{self.attribute}?contains': other
         }
     def contains(self, other) -> dict:
-        other = transform_identifier(other, on_unknown='ignore')
         return {
             f'{self.attribute}?contains': other
         }
 
     def not_contains(self, other) -> dict:
-        other = transform_identifier(other, on_unknown='ignore')
         return {
             f'{self.attribute}?not_contains': other
         }

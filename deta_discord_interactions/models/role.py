@@ -1,4 +1,5 @@
 import dataclasses
+from typing import Optional
 
 from deta_discord_interactions.models.utils import LoadableDataclass
 
@@ -28,6 +29,10 @@ class Role(LoadableDataclass):
         Whether the role can be mentioned by all users.
     tags
         Miscellaneous information about the role.
+    icon
+        Hash of the role's icon
+    unicode_emoji
+        Unicode emoji of the role (alternative to icons)
     """
 
     id: str = None
@@ -37,4 +42,6 @@ class Role(LoadableDataclass):
     position: int = None
     managed: bool = None
     mentionable: bool = None
-    tags: dict = None
+    tags: Optional[dict] = None
+    icon: Optional[str] = None
+    unicode_emoji: Optional[str] = None

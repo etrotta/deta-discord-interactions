@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import functools
 import json
 import pathlib
@@ -8,8 +6,6 @@ from typing import Callable, Optional
 from deta.base import Util
 
 from deta_discord_interactions.utils.database.bound_meta import BoundMeta
-
-# In the future: Perhaps get rid of this and use pytest fixtures instead?
 
 operations = {
     # no prefix = eq
@@ -62,10 +58,10 @@ class FetchResponse:
 
 _memory_inventory = {}
 class Base:
-    def __init__(self, name: str, sync_disk: bool = False):
+    def __init__(self, name: str, sync_disk: bool = False, folder: Optional[str] = None):
         self.name = name
         if sync_disk:
-            self.inventory = DiskBaseBackend(name)
+            self.inventory = DiskBaseBackend(f'{name}.json', folder)
         else:
             self.inventory = _memory_inventory.setdefault(name, {})
 
@@ -75,7 +71,12 @@ class Base:
             obj = json.loads(obj)
         return obj
 
-    def insert(self, data, key):
+    def insert(self, data, key, *, expire_in: None=None, expire_at: None=None):
+        if expire_in:
+            print(f"Ignoring parameter (not supported by local base): {expire_in=}")
+        if expire_at:
+            print(f"Ignoring parameter (not supported by local base): {expire_at=}")
+
         if key in self.inventory:
             raise Exception(f"Item with key '{key}' already exists")
         self.inventory[key] = json.dumps(data)
@@ -102,11 +103,18 @@ class Base:
         
         self.inventory[key] = json.dumps(obj)
 
+    def delete(self, key):
+        del self.inventory[key]
+
     def put_many(self, items):
         items = {record.pop('key'): json.dumps(record) for record in (item.copy() for item in items)}
         self.inventory.update(items)
 
-    def put(self, item, key):
+    def put(self, item, key, *, expire_in: None=None, expire_at: None=None):
+        if expire_in:
+            print(f"Ignoring parameter (not supported by local base): {expire_in=}")
+        if expire_at:
+            print(f"Ignoring parameter (not supported by local base): {expire_at=}")
         self.inventory[key] = json.dumps(item)
 
     def fetch(self, query, limit, last):
@@ -120,7 +128,7 @@ class Base:
         if isinstance(last, str):
             index = next((i for i, record in enumerate(results) if record['key'] == last), None)
             results = results[index:]
-        if limit and limit > 0:
+        if limit:
             results = results[:limit]
         return FetchResponse(items=results)
 
@@ -137,14 +145,20 @@ import os
 
 class DiskBaseBackend(dict, metaclass=BoundMeta, bind_methods=bind_methods):
     """Database backend that saves to disk whenever it's modified."""
-    def __init__(self, database_name: str):
+    def __init__(self, database_name: str, folder: Optional[str]):
+        if folder:
+            self._path = pathlib.Path(folder) / database_name
+        elif (env_folder := os.getenv("DETA_ORM_FOLDER")):
+            self._path = pathlib.Path(env_folder) / database_name
+        else:
+            raise Exception("When using a Database on DISK mode, you must specify the path."\
+                "\nUsing the `disk_base_path` keyword argument or the `DETA_ORM_FOLDER` environment variable.")
         try:
-            with (pathlib.Path(os.getenv("DISCORD_INTERACTIONS_DATABASE_FOLDER")) / database_name).open('r') as file:
+            with self._path.open('r') as file:
                 super().__init__(json.load(file))
         except Exception:
             super().__init__()
-        self._file_name = database_name
-        if os.getenv("DISCORD_INTERACTIONS_DATABASE_FORMAT_NICELY", False):
+        if os.getenv("DETA_ORM_FORMAT_NICELY", False):
             self._options = {
                 "indent": 4,
                 "sort_keys": True,
@@ -157,6 +171,6 @@ class DiskBaseBackend(dict, metaclass=BoundMeta, bind_methods=bind_methods):
 
 
     def _sync(self, method, value, *args, **kwargs):
-        with (pathlib.Path(os.getenv("DISCORD_INTERACTIONS_DATABASE_FOLDER")) / self._file_name).open('w') as file:
+        with self._path.open('w') as file:
             json.dump(dict(self), file, **self._options)
         return value

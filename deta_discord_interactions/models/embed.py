@@ -1,5 +1,4 @@
 from dataclasses import dataclass, asdict
-from typing import List
 
 from deta_discord_interactions.models.utils import LoadableDataclass
 
@@ -90,7 +89,7 @@ class Embed(LoadableDataclass):
     video: Media = None
     provider: Provider = None
     author: Author = None
-    fields: List[Field] = None
+    fields: list[Field] = None
 
     def dump(self):
         """

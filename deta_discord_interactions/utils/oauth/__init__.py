@@ -2,6 +2,7 @@ from deta_discord_interactions.utils.oauth.oauth import (
     enable_oauth,
     request_oauth,
     create_webhook,
+    remember_callback,
 )
 from deta_discord_interactions.utils.oauth.model import (
     OAuthToken,
@@ -15,6 +16,7 @@ __all__ = [
     'enable_oauth',
     'request_oauth',
     'create_webhook',
+    'remember_callback',
 
     "OAuthToken",
     "Webhook",

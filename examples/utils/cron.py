@@ -1,7 +1,8 @@
-# NOTE: Remember to run `deta cron set "..."`
-# See https://docs.deta.sh/docs/micros/cron for the supported intervals
+# NOTE: Remember to set the Scheduled Actions on the Spacefile
+# https://deta.space/docs/en/basics/micros#scheduled-actions
 
 from typing import Optional
+from dataclasses import dataclass
 from deta_discord_interactions import DiscordInteractionsBlueprint
 from deta_discord_interactions import Message
 from deta_discord_interactions import Context
@@ -10,14 +11,19 @@ from deta_discord_interactions import Autocomplete, Option, Choice
 
 from deta_discord_interactions.enums import PERMISSION
 
-from deta_discord_interactions.utils.database import Database, AutoSyncRecord
+from deta_discord_interactions.utils.database import Database, LoadableDataclass
 from deta_discord_interactions.utils.database import Query, Field
 
 from deta_discord_interactions.utils.oauth import OAuthToken, Webhook
-from deta_discord_interactions.utils.oauth import create_webhook
+from deta_discord_interactions.utils.oauth import create_webhook, remember_callback
 
+@dataclass
+class Repeater(LoadableDataclass):
+    internal_name: str
+    webhook: Webhook
+    message: str
 
-database = Database(name="webhooks_tasks", record_type=AutoSyncRecord)
+database = Database(name="scheduled_webhooks", record_type=Repeater)
 
 blueprint = DiscordInteractionsBlueprint()
 
@@ -29,15 +35,13 @@ hooks = blueprint.command_group(
     dm_permission=False,
 )
 
+@remember_callback
 def save_webhook(oauth: Optional[OAuthToken], ctx: Context, internal_name: str, message: str):
     if oauth is None:
         return f"Canceled creation of webhook {internal_name}"
     webhook = oauth.webhook
     key = f'webhook_{ctx.author.id}_{internal_name}'
-    with database[key] as record:
-        record["hook"] = webhook
-        record["internal_name"] = internal_name
-        record["message"] = message
+    database[key] = Repeater(internal_name, webhook, message)
     # Do NOT return a Message - this is what the end user will see in their browser
     return f"Registered webhook {internal_name} with message {message}"
 
@@ -49,25 +53,47 @@ def register_webhook(ctx, internal_name: str, message: str):
     return message
 
 
-@blueprint.task()
-def run_all_webhooks():
-    for record in database.fetch():
+@blueprint.action("trigger_repeaters")
+def run_all_webhooks(event):
+    errors = []
+    records = database.fetch()
+    if not records:
+        print("No active repeaters found. Consider disabling the Scheduled action if you do not wish to use them.")
+    for record in records:
         try:
-            record["hook"].send(record["message"])
-        except Exception:
-            print("Failed to send a message to webhook {record.key!r}")
+            record.webhook.send(record.message)
+        except Exception as err:
+            print(f"Failed to send a message to webhook {record.internal_name!r}", flush=True)
+            errors.append(err)
+    if errors:
+        raise Exception(errors)
 
+
+@hooks.command("invoke")
+def invoke_webhook(ctx, internal_name: Autocomplete[str], message: str):
+    "Send a message via an existing Webhook"
+    key = f'webhook_{ctx.author.id}_{internal_name}'
+    repeater: Optional[Repeater] = database.get(key)
+    if repeater is None:
+        return Message("Webhook not found", ephemeral=True)
+    try:
+        repeater.webhook.send(message)
+        return Message("Sent message", ephemeral=True)
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        return Message("Somethign went wrong", ephemeral=True)
 
 @hooks.command("delete")
 def delete_webhook(ctx, internal_name: Autocomplete[str], reason: str = None):
     "Delete a repeating Webhook"
     key = f'webhook_{ctx.author.id}_{internal_name}'
-    webhook: Webhook = database.get(key).get("hook")
-    if webhook is None:
+    repeater: Optional[Repeater] = database.get(key)
+    if repeater is None:
         return Message("Webhook not found", ephemeral=True)
     try:
         del database[key]
-        webhook.delete(reason=reason)
+        repeater.webhook.delete(reason=reason)
     except Exception:
         return Message("Failed to delete webhook, probably was already deleted", ephemeral=True)
     else:
@@ -83,8 +109,8 @@ def webhook_name_autocomplete_handler(ctx, internal_name: Option = None, **_):
     options = []
     records = database.fetch(Query(Field("key").startswith(key_prefix)))
     for record in records:
-        display = f"{record['internal_name']}: {record['hook'].name}"
-        value = record["internal_name"]
+        display = f"{record.internal_name}: {record.webhook.name}"
+        value = record.internal_name
         options.append(Choice(name=display, value=value))
 
     options.sort(key=lambda option: option.name)

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Union, TYPE_CHECKING
+from typing import Callable, Optional, Union, TYPE_CHECKING
 import inspect
 import itertools
 
@@ -67,8 +67,10 @@ class Context(LoadableDataclass):
         :class:`Channel` objects for each channel specified as an option.
     roles
         :class:`Role` object for each role specified as an option.
-    target
-        The targeted :class:`User` or message.
+    target_user
+        The targeted :class:`User` if it is a User context menu command.
+    target_message
+        The targeted :class:`Message` if it is a Message context menu command.
     message
         The message that the invoked components are attached to.
         Only available on component interactions.
@@ -79,8 +81,7 @@ class Context(LoadableDataclass):
     app_permissions
         Bitwise set of permissions the app or bot has within the channel the interaction was sent from.
     """
-
-    author: Union[Member, User] = None
+    author: Optional[User] = None
     id: str = None
     type: int = None
     command_type: int = None
@@ -93,21 +94,22 @@ class Context(LoadableDataclass):
     resolved: dict = None
     command_name: str = None
     command_id: str = None
-    members: List[Member] = None
-    channels: List[Channel] = None
-    roles: List[Role] = None
-    message: Message = None
+    members: Optional[list[Member]] = None
+    channels: Optional[list[Channel]] = None
+    roles: Optional[list[Role]] = None
+    message: Optional[Message] = None
     locale: Optional[str] = None
     guild_locale: Optional[str] = None
     app_permissions: Optional[str] = None
-    discord: "DiscordInteractions" = None
+    discord: Optional["DiscordInteractions"] = None
 
     custom_id: str = None
     primary_id: str = None
     handler_state: list = None
 
     target_id: str = None
-    target: Union[User, Message] = None
+    target_user: Optional[User] = None
+    target_message: Optional[Message] = None
 
     @classmethod
     def from_data(
@@ -120,8 +122,7 @@ class Context(LoadableDataclass):
             discord=discord,
             id=data.get("id"),
             type=data.get("type"),
-            command_type=data.get("data", {}).get("type")
-            or ApplicationCommandType.CHAT_INPUT,
+            command_type=data.get("data", {}).get("type") or ApplicationCommandType.CHAT_INPUT,
             token=data.get("token"),
             channel_id=data.get("channel_id"),
             guild_id=data.get("guild_id"),
@@ -241,17 +242,20 @@ class Context(LoadableDataclass):
         Parse the target of the incoming interaction.
 
         For User and Message commands, the target is the relevant user or
-        message. This method sets the `ctx.target` field.
+        message. This method sets the `ctx.target_user` or `ctx.target_message` field.
         """
         if self.command_type == ApplicationCommandType.USER:
             if self.target_id in self.members:
-                self.target = self.members[self.target_id]
+                self.target_user = self.members[self.target_id]
             else:
-                self.target = self.users[self.target_id]
+                self.target_user = self.users[self.target_id]
         elif self.command_type == ApplicationCommandType.MESSAGE:
-            self.target = self.messages[self.target_id]
-        else:
-            self.target = None
+            self.target_message = self.messages[self.target_id]
+
+    @property
+    def target(self) -> Union[Message, User, None]:
+        "Returns the target of this context"  # Partially for backwards compatibility
+        return self.target_message or self.target_user
 
     def parse_components(self):
         self.components = [Component.from_dict(c) for c in self.components]
@@ -264,9 +268,9 @@ class Context(LoadableDataclass):
         if self.command_type == ApplicationCommandType.CHAT_INPUT:
             return self.create_args_chat_input()
         elif self.command_type == ApplicationCommandType.USER:
-            return [self.target], {}
+            return [self.target_user], {}
         elif self.command_type == ApplicationCommandType.MESSAGE:
-            return [self.target], {}
+            return [self.target_message], {}
 
     def create_autocomplete_args(self):
         """
@@ -294,7 +298,6 @@ class Context(LoadableDataclass):
                     CommandOptionType.SUB_COMMAND,
                     CommandOptionType.SUB_COMMAND_GROUP,
                 ]:
-
                     args.append(option["name"])
 
                     sub_args, sub_kwargs = create_args_recursive(option, resolved)

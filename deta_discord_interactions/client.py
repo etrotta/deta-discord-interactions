@@ -79,10 +79,14 @@ class Client:
             return Message.from_return_value(
                 command.run(self.current_context, *names[i:], **params)
             )
-
-        return Message.from_return_value(
-            command.run(self.current_context, self.current_context.target)
-        )
+        elif command.type == ApplicationCommandType.MESSAGE:
+            return Message.from_return_value(
+                command.run(self.current_context, self.current_context.target_message)
+            )
+        elif command.type == ApplicationCommandType.USER:
+            return Message.from_return_value(
+                command.run(self.current_context, self.current_context.target_user)
+            )
 
     def run_handler(self, custom_id: str, *args):
         """
@@ -152,3 +156,14 @@ class Client:
         return AutocompleteResult.from_return_value(
             command.run_autocomplete(self.current_context, *args, **kwargs)
         )
+
+    def run_action(self, action_id: str):
+        """
+        Run a specified Deta Action.
+
+        Parameters
+        ----------
+        action_id
+            The ID of the action to run.
+        """
+        return self.discord.run_deta_action({"id": action_id})
