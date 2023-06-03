@@ -1,15 +1,9 @@
-import os
-import sys
 
-from flask import Flask
-
-# This is just here for the sake of examples testing
-# to make sure that the imports work
-# (you don't actually need it in your code)
-sys.path.insert(1, ".")
+import uuid
+from dataclasses import dataclass
 
 from deta_discord_interactions import (
-    DiscordInteractions,
+    DiscordInteractionsBlueprint,
     Message,
     ActionRow,
     Button,
@@ -19,82 +13,22 @@ from deta_discord_interactions import (
     SelectMenuOption,
 )
 
+from deta_discord_interactions.utils.database import Database, LoadableDataclass
 
-app = Flask(__name__)
-discord = DiscordInteractions(app)
+bp = DiscordInteractionsBlueprint()
 
-app.config["DISCORD_CLIENT_ID"] = os.environ["DISCORD_CLIENT_ID"]
-app.config["DISCORD_PUBLIC_KEY"] = os.environ["DISCORD_PUBLIC_KEY"]
-app.config["DISCORD_CLIENT_SECRET"] = os.environ["DISCORD_CLIENT_SECRET"]
-
-
-discord.update_commands()
-
-
-# In reality, you'd store these values in a database
-# For simplicity, we store them as globals in this example
-# Generally, this is a bad idea
-# https://stackoverflow.com/questions/32815451/
-click_count = 0
-
-
-# The handler edits the original message by setting update=True
-# It sets the action for the button with custom_id
-@discord.custom_handler()
-def handle_click(ctx):
-    global click_count
-    click_count += 1
-
-    return Message(
-        content=f"The button has been clicked {click_count} times",
-        components=[
-            ActionRow(
-                components=[
-                    Button(
-                        style=ButtonStyles.PRIMARY,
-                        custom_id=handle_click,
-                        label="Click Me!",
-                    )
-                ]
-            )
-        ],
-        update=True,
-    )
-
-
-# The main command sends the initial message
-@discord.command()
-def click_counter(ctx):
-    "Count the number of button clicks"
-
-    return Message(
-        content=f"The button has been clicked {click_count} times",
-        components=[
-            ActionRow(
-                components=[
-                    Button(
-                        style=ButtonStyles.PRIMARY,
-                        custom_id=handle_click,
-                        label="Click Me!",
-                    )
-                ]
-            )
-        ],
-    )
-
-
-# You can also return a normal message
-@discord.custom_handler()
+# You can return a normal message
+@bp.custom_handler("handle_upvote")
 def handle_upvote(ctx):
     return f"Upvote by {ctx.author.display_name}!"
 
 
-@discord.custom_handler()
+@bp.custom_handler("handle_downvote")
 def handle_downvote(ctx):
     return f"Downvote by {ctx.author.display_name}!"
 
 
-@discord.command()
+@bp.command()
 def voting(ctx, question: str):
     "Vote on something!"
 
@@ -105,12 +39,12 @@ def voting(ctx, question: str):
                 components=[
                     Button(
                         style=ButtonStyles.SUCCESS,
-                        custom_id=handle_upvote,
+                        custom_id="handle_upvote",
                         emoji={"name": "⬆️"},
                     ),
                     Button(
                         style=ButtonStyles.DANGER,
-                        custom_id=handle_downvote,
+                        custom_id="handle_downvote",
                         emoji={
                             "name": "⬇️",
                         },
@@ -122,18 +56,18 @@ def voting(ctx, question: str):
 
 
 # Ephemeral messages and embeds work
-@discord.custom_handler()
+@bp.custom_handler("avatar_view")
 def handle_avatar_view(ctx):
     return Message(
         embed=Embed(
             title=f"{ctx.author.display_name}",
-            description=f"{ctx.author.username}#{ctx.author.discriminator}",
+            description=f"{ctx.author.username}",
         ),
         ephemeral=True,
     )
 
 
-@discord.command()
+@bp.command()
 def username(ctx):
     "Show your username and discriminator"
 
@@ -144,7 +78,7 @@ def username(ctx):
                 components=[
                     Button(
                         style=ButtonStyles.PRIMARY,
-                        custom_id=handle_avatar_view,
+                        custom_id="avatar_view",
                         label="View User!",
                     )
                 ]
@@ -154,12 +88,12 @@ def username(ctx):
 
 
 # Return nothing for no action
-@discord.custom_handler()
+@bp.custom_handler("noop")
 def handle_do_nothing(ctx):
     print("Doing nothing...")
 
 
-@discord.command()
+@bp.command()
 def do_nothing(ctx):
     return Message(
         content="Do nothing",
@@ -168,7 +102,7 @@ def do_nothing(ctx):
                 components=[
                     Button(
                         style=ButtonStyles.PRIMARY,
-                        custom_id=handle_do_nothing,
+                        custom_id="noop",
                         label="Nothing at all!",
                     )
                 ]
@@ -178,7 +112,7 @@ def do_nothing(ctx):
 
 
 # Link buttons don't need a handler
-@discord.command()
+@bp.command()
 def google(ctx):
     return Message(
         content="search engine",
@@ -196,12 +130,75 @@ def google(ctx):
     )
 
 
-# Use a list with the Custom ID to include additional state information
-# Optionally specify the type (e.g. int) to automatically convert
-@discord.custom_handler()
-def handle_stateful(ctx, interaction_id, current_count: int):
-    current_count += 1
+# Reminder: Global variables ***will not work*** on Deta. Use Deta Base or Deta Drive instead.
+# Assume that your entire app may be reset every request (every command)
+@dataclass
+class ClicksCounter(LoadableDataclass):
+    clicks: int
 
+database = Database("clicky_counter", ClicksCounter)
+# Use a list with the Custom ID to include additional state information
+
+
+# The handler can edit the original message by setting update=True
+# It sets the action for the button with custom_id
+
+bp = DiscordInteractionsBlueprint()
+
+@bp.custom_handler("clicky")
+def handle_click(ctx, custom_id: str):
+    counter = database[custom_id]
+    counter.clicks += 1
+    # Remember to save changes back
+    database[custom_id] = counter
+    return Message(
+        content=f"The button has been clicked {counter.clicks} times",
+        components=[
+            ActionRow(
+                components=[
+                    Button(
+                        style=ButtonStyles.PRIMARY,
+                        custom_id=("clicky", custom_id),
+                        label="Click Me!",
+                    )
+                ]
+            )
+        ],
+        update=True,
+    )
+
+
+# The main command sends the initial message
+@bp.command()
+def click_counter(ctx, custom_id: str = None):
+    "Count the number of button clicks"
+    if not custom_id:
+        custom_id = str(uuid.uuid4())
+    counter = database.get(custom_id)
+    if counter is None:
+        counter = ClicksCounter(0)
+        database[custom_id] = counter
+    return Message(
+        content=f"The button {custom_id} has been clicked {counter.clicks} times",
+        components=[
+            ActionRow(
+                components=[
+                    Button(
+                        style=ButtonStyles.PRIMARY,
+                        custom_id=('clicky', custom_id),
+                        label="Click Me!",
+                    )
+                ]
+            )
+        ],
+    )
+
+
+# (Note that below the entire state is being tracked by the button ID on discord, it is not stored on Deta Base at all)
+# Optionally specify the type (e.g. int) to automatically convert
+@bp.custom_handler("count_converter")
+def handle_converter(ctx, interaction_id, current_count: int):
+    current_count += 1
     return Message(
         content=(
             f"This button has been clicked {current_count} times. "
@@ -213,7 +210,7 @@ def handle_stateful(ctx, interaction_id, current_count: int):
                 components=[
                     Button(
                         style=ButtonStyles.PRIMARY,
-                        custom_id=[handle_stateful, interaction_id, current_count],
+                        custom_id=["count_converter", interaction_id, current_count],
                         label="Click Me!",
                     )
                 ]
@@ -223,18 +220,18 @@ def handle_stateful(ctx, interaction_id, current_count: int):
     )
 
 
-@discord.command()
+@bp.command()
 def stateful_click_counter(ctx):
     "Count the number of button clicks for this specific button."
 
     return Message(
-        content=f"Click the button!",
+        content="Click the button!",
         components=[
             ActionRow(
                 components=[
                     Button(
                         style=ButtonStyles.PRIMARY,
-                        custom_id=[handle_stateful, ctx.id, 0],
+                        custom_id=["count_converter", ctx.id, 0],
                         label="Click Me!",
                     )
                 ]
@@ -243,15 +240,14 @@ def stateful_click_counter(ctx):
     )
 
 
-@discord.custom_handler()
+@bp.custom_handler("parser")
 def handle_parse_message(ctx):
     return f"I told you, {ctx.message.content}!"
 
 
-@discord.command()
+@bp.command()
 def message_parse_demo(ctx):
     "Demonstrate the ability to parse the original message in a handler."
-
     return Message(
         content="The answer is 42",
         components=[
@@ -259,19 +255,10 @@ def message_parse_demo(ctx):
                 components=[
                     Button(
                         style=ButtonStyles.PRIMARY,
-                        custom_id=handle_parse_message,
+                        custom_id="parser",
                         label="What is the answer?",
                     )
                 ]
             )
         ],
     )
-
-
-discord.set_route("/interactions")
-discord.update_commands(guild_id=os.environ["TESTING_GUILD"])
-
-
-if __name__ == "__main__":
-    # Disable threading because of global variables
-    app.run(threaded=False)

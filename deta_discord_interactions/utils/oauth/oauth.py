@@ -29,7 +29,11 @@ pending_oauths = Database(name="_discord_interactions_pending_oauths", record_ty
 remember_callback = pending_oauths.remember_function
 
 def enable_oauth(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
-    "Allows for the app to receive and process OAuth and create Webhooks"
+    """Allows for the app to receive and process OAuth and create Webhooks    
+
+    Usage:
+    `app = enable_oauth(app)`
+    """
     app.route(path)(_handle_oauth)
 
 

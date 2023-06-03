@@ -13,3 +13,15 @@ def ping(ctx):
 
 The documentation of the original library is available on [readthedocs](https://flask-discord-interactions.readthedocs.io/).
 The documentation of the Fork is still Work in Progress.
+
+
+
+## Known issues
+- No good way to defer nor follow up (any spawned threads are killed as soon as the main function returns)
+- The Deta Space changes made it a quite few times more complicated to setup than Cloud used to be
+- Not particularly beginner friendly
+- Poorly documented
+
+## As far as security goes
+The `http.server` module of the standard library that `deta_discord_interactions.http` relies on is not recommended for production usage. Use it at your own risk.
+Any server that supports [PEP 3333](https://peps.python.org/pep-3333/) and works in serverless environments should work, so you may want to use something like https://gunicorn.org/ instead of the `deta_discord_interactions.http` used in Examples.

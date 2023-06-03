@@ -1,12 +1,3 @@
-import sys
-
-from flask import Flask
-
-# This is just here for the sake of examples testing
-# to make sure that the imports work
-# (you don't actually need it in your code)
-sys.path.insert(1, ".")
-
 from deta_discord_interactions import (
     DiscordInteractions,
     Client,
@@ -15,13 +6,12 @@ from deta_discord_interactions import (
     Context,
     Member,
 )
+from deta_discord_interactions.models.embed import Embed
 
 
-app = Flask(__name__)
-discord = DiscordInteractions(app)
+discord = DiscordInteractions()
 
 test_client = Client(discord)
-
 
 # Simplest type of command: respond with a string
 @discord.command()
@@ -31,36 +21,20 @@ def ping(ctx, pong: str = "pong"):
 
 
 print(test_client.run("ping"))
-print(test_client.run("ping", pong="ping"))
-
+print(test_client.run("ping", pong="spam"))
 
 groupy = discord.command_group("groupy")
-
 
 @groupy.command()
 def group(ctx, embed: bool):
     if embed:
-        return Message(embed={"title": "Groupy group"})
+        return Message(Embed(title="Group"))
     else:
         return "Groupy group"
 
 
 print(test_client.run("groupy", "group", True))
 print(test_client.run("groupy", "group", False))
-
-
-@discord.command(
-    options=[
-        {"type": CommandOptionType.SUB_COMMAND, "name": "subcommand_1"},
-        {"type": CommandOptionType.SUB_COMMAND, "name": "subcommand_2"},
-    ]
-)
-def manual_style_group(ctx, sub):
-    return f"subcommand is {sub}"
-
-
-print(test_client.run("manual_style_group", "subcommand_1"))
-print(test_client.run("manual_style_group", "subcommand_2"))
 
 
 @discord.command()
@@ -72,3 +46,5 @@ context = Context(author=Member(username="Bob"))
 
 with test_client.context(context):
     print(test_client.run("uses_context"))
+
+# For more examples, see the Tests

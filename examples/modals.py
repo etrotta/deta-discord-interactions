@@ -1,15 +1,5 @@
-import os
-import sys
-
-from flask import Flask
-
-# This is just here for the sake of examples testing
-# to make sure that the imports work
-# (you don't actually need it in your code)
-sys.path.insert(1, ".")
-
 from deta_discord_interactions import (
-    DiscordInteractions,
+    DiscordInteractionsBlueprint,
     Message,
     Modal,
     TextInput,
@@ -17,19 +7,11 @@ from deta_discord_interactions import (
     ActionRow,
     Button,
 )
+from deta_discord_interactions.context import Context
 
-app = Flask(__name__)
-discord = DiscordInteractions(app)
+bp = DiscordInteractionsBlueprint()
 
-app.config["DISCORD_CLIENT_ID"] = os.environ["DISCORD_CLIENT_ID"]
-app.config["DISCORD_PUBLIC_KEY"] = os.environ["DISCORD_PUBLIC_KEY"]
-app.config["DISCORD_CLIENT_SECRET"] = os.environ["DISCORD_CLIENT_SECRET"]
-
-
-discord.update_commands()
-
-
-@discord.custom_handler("example_modal")
+@bp.custom_handler("example_modal")
 def modal_callback(ctx):
     msg = (
         f"Hello {ctx.get_component('name').value}! "
@@ -40,7 +22,7 @@ def modal_callback(ctx):
     return Message(msg, ephemeral=True)
 
 
-@discord.command(name="test_modal", description="Opens a Modal window")
+@bp.command(name="test_modal", description="Opens a Modal window")
 def modal(ctx):
     fields = [
         ActionRow(
@@ -82,15 +64,15 @@ def modal(ctx):
     return Modal("example_modal", "Tell me about yourself", fields)
 
 
-@discord.custom_handler()
-def example_modal_2(ctx):
+@bp.custom_handler("example_modal_2")
+def example_modal_2(ctx: Context):
     return Message(f"Hello {ctx.get_component('name').value}!", update=True)
 
 
-@discord.custom_handler()
+@bp.custom_handler("launch_modal")
 def launch_modal(ctx):
     return Modal(
-        example_modal_2,
+        "example_modal_2",
         "Tell me about yourself",
         [
             ActionRow(
@@ -108,17 +90,9 @@ def launch_modal(ctx):
     )
 
 
-@discord.command()
+@bp.command()
 def launch_modal_from_button(ctx):
     return Message(
         content="Launch Modal",
-        components=[ActionRow([Button(custom_id=launch_modal, label="Launch Modal")])],
+        components=[ActionRow([Button(custom_id="launch_modal", label="Launch Modal")])],
     )
-
-
-discord.set_route("/interactions")
-discord.update_commands(guild_id=os.environ["TESTING_GUILD"])
-
-
-if __name__ == "__main__":
-    app.run()

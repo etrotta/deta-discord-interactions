@@ -90,7 +90,7 @@ class Context(LoadableDataclass):
     guild_id: str = None
     options: list = None
     values: list = None
-    components: list = None
+    components: list = None  # TODO check load/parse when loading from base?
     resolved: dict = None
     command_name: str = None
     command_id: str = None
@@ -514,7 +514,7 @@ class Context(LoadableDataclass):
             except KeyError:
                 raise ValueError(f"Unknown command: {command_name}")
 
-    def get_component(self, component_id: str):
+    def get_component(self, component_id: str) -> Component:
         """
         Get a Component, only available for Modal Contexts.
         If the component was not found, raises a LookupError.
