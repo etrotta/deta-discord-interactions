@@ -38,7 +38,7 @@ class AutocompleteResult:
     choices
         A list of dicts representing the choices to be presented to the user.
     """
-    choices: list[dict]
+    choices: list[Choice]
 
     def encode(self):
         """
@@ -53,7 +53,7 @@ class AutocompleteResult:
         """
         data = {
             "type": ResponseType.APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
-            "data": {"choices": self.choices},
+            "data": {"choices": [choice.dump() for choice in self.choices]},
         }
 
         return json.dumps(data).encode("UTF-8"), "application/json"
@@ -77,16 +77,13 @@ class AutocompleteResult:
         if isinstance(value, AutocompleteResult):
             return value
         elif isinstance(value, dict):
-            return cls([value])
-        elif isinstance(value, list) and all(
-            isinstance(choice, dict) for choice in value
-        ):
-            return cls(value)
-        elif isinstance(value, list) and all(
-            isinstance(choice, Choice) for choice in value
-        ):
-            return cls([choice.dump() for choice in value])
+            return cls([Choice(name=key, value=val) for key, val in value.items()])
         elif isinstance(value, list):
-            return cls(
-                [{"name": str(choice), "value": choice} for choice in value]
-            )
+            if all(isinstance(x, Choice) for x in value):
+                return cls(value)
+            elif all(isinstance(x, dict) for x in value):
+                return cls([Choice(d["name"], d["value"], d.get("name_localizations")) for d in value])
+        
+        return cls(
+            [Choice(str(choice), choice) for choice in value]
+        )

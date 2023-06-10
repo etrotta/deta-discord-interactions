@@ -7,7 +7,7 @@ with open("README.md") as file:
 
 setup(
     name="Deta-Discord-Interactions",
-    version="0.1.0",
+    version="0.1.1",
     url="https://github.com/etrotta/flask-discord-interactions/tree/deta",
     author="etrotta",
     author_email="etrotta@duck.com",

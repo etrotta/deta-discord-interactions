@@ -4,6 +4,7 @@ import typing
 
 from deta_discord_interactions.context import Context
 from deta_discord_interactions.models import Message
+from deta_discord_interactions.models import Modal
 from deta_discord_interactions.models import AutocompleteResult, Option
 from deta_discord_interactions.command import SlashCommandSubgroup
 from deta_discord_interactions.models.command import ApplicationCommandType
@@ -51,7 +52,7 @@ class Client:
         finally:
             self.current_context = Context()
 
-    def run(self, *names, **params):
+    def run(self, *names, **params) -> typing.Union[Message, Modal]:
         """
         Run a specified Application Command.
 
@@ -76,19 +77,19 @@ class Client:
             else:
                 i += 1
 
-            return Message.from_return_value(
-                command.run(self.current_context, *names[i:], **params)
-            )
+            result = command.run(self.current_context, *names[i:], **params)
         elif command.type == ApplicationCommandType.MESSAGE:
-            return Message.from_return_value(
-                command.run(self.current_context, self.current_context.target_message)
-            )
+            result = command.run(self.current_context, self.current_context.target_message)
         elif command.type == ApplicationCommandType.USER:
-            return Message.from_return_value(
-                command.run(self.current_context, self.current_context.target_user)
-            )
+            result = command.run(self.current_context, self.current_context.target_user)
+        else:
+            raise Exception("Invalid command type")
 
-    def run_handler(self, custom_id: str, *args):
+        if isinstance(result, Modal):
+            return result
+        return Message.from_return_value(result)
+
+    def run_handler(self, custom_id: str, *args) -> typing.Union[Message, Modal]:
         """
         Run a specified custom ID handler.
 
@@ -108,8 +109,9 @@ class Client:
         handler = self.discord.custom_id_handlers[new_context.primary_id]
 
         args = new_context.create_handler_args(handler)
-
         response = handler(new_context, *args)
+        if isinstance(response, Modal):
+            return response
         return Message.from_return_value(response)
 
 
