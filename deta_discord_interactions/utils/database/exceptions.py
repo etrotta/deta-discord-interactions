@@ -9,3 +9,6 @@ class UnexpectedFunction(DatabaseError):
 
 class UnexpectedEscapeString(DatabaseError):
     "String starts with `$` reserved character, but does not matches any planned conversions"
+
+class DriveOutOfBoundsError(DatabaseError):
+    "Drive Path tries to go beyond the root using `..`"

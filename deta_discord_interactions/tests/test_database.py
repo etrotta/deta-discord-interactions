@@ -11,7 +11,7 @@ class Mini(LoadableDataclass):
     b: float
 
 @dataclasses.dataclass
-class TestRecord(LoadableDataclass):
+class MyTestRecord(LoadableDataclass):
     name: str
     number: int
     date: datetime.datetime
@@ -31,11 +31,11 @@ class WeirdTestRecord(LoadableDataclass):
 
 @pytest.fixture()
 def database():
-    return Database("test_database", record_type=TestRecord, base_mode="MEMORY")
+    return Database("test_database", record_type=MyTestRecord, base_mode="MEMORY")
 
 @pytest.fixture()
 def disk_database(tmp_path):
-    return Database("test_database", record_type=TestRecord, base_mode="DISK", base_folder=tmp_path)
+    return Database("test_database", record_type=MyTestRecord, base_mode="DISK", base_folder=tmp_path)
 
 @pytest.fixture()
 def weird_disk_database(tmp_path):
@@ -55,7 +55,7 @@ def mini_rec():
 
 @pytest.fixture()
 def foo_rec(foo_func, mini_rec):
-    foo = TestRecord(
+    foo = MyTestRecord(
         "foo",
         1,
         datetime.datetime.fromisoformat("2020-01-01"),
@@ -80,10 +80,10 @@ def weird_rec(mini_rec):
 DATE = datetime.datetime.fromisoformat("2020-01-01")
 
 def test_encode_decode(
-        database: Database[str, TestRecord],
+        database: Database[str, MyTestRecord],
         mini_rec: Mini,
         foo_func: typing.Callable,
-        foo_rec: TestRecord,
+        foo_rec: MyTestRecord,
         weird_rec: WeirdTestRecord,
     ):
     # Part 1) to_dict()
@@ -132,7 +132,7 @@ def test_encode_decode(
     assert database.decode_entry(database.encode_entry(foo_rec.to_dict())) == foo_rec.to_dict()
     assert database.decode_entry(database.encode_entry(weird_rec.to_dict())) == weird_rec.to_dict()
 
-def test_record_loading(database: Database[str, TestRecord], foo_rec: TestRecord, mini_rec: Mini, weird_rec: WeirdTestRecord):
+def test_record_loading(database: Database[str, MyTestRecord], foo_rec: MyTestRecord, mini_rec: Mini, weird_rec: WeirdTestRecord):
     # Part 4) record loading
     assert mini_rec.from_dict(mini_rec.to_dict()) == mini_rec
     assert foo_rec.from_dict(foo_rec.to_dict()) == foo_rec
@@ -152,7 +152,7 @@ def test_record_loading(database: Database[str, TestRecord], foo_rec: TestRecord
     assert foo_rec.from_dict(database.decode_entry(database.encode_entry(foo_rec.to_dict()))).nested == foo_rec.nested
     assert foo_rec.from_dict(database.decode_entry(database.encode_entry(foo_rec.to_dict()))).func() == foo_rec.func()
 
-def test_record_storing(database: Database[str, TestRecord], foo_rec: TestRecord):
+def test_record_storing(database: Database[str, MyTestRecord], foo_rec: MyTestRecord):
     # Part 6) storing and retrieving
     # not gonna lie, may have skipped a few steps, but whatever
     # Currently this uses an in-memory proxy-ish database
@@ -186,7 +186,7 @@ def test_record_storing(database: Database[str, TestRecord], foo_rec: TestRecord
     database.put_many({"foo": foo_rec})
     assert database.get("foo") == foo_rec
 
-def test_queries(database: Database[str, TestRecord], foo_rec: TestRecord):
+def test_queries(database: Database[str, MyTestRecord], foo_rec: MyTestRecord):
     # Currently this uses an in-memory proxy-ish database
     # in the future it may be better to use monkeypatching 
     # and make sure that the requests it makes to the API look right
@@ -217,10 +217,10 @@ def test_queries(database: Database[str, TestRecord], foo_rec: TestRecord):
 
 
 def test_disk_database(
-        disk_database: Database[str, TestRecord],
-        foo_rec: TestRecord,
+        disk_database: Database[str, MyTestRecord],
+        foo_rec: MyTestRecord,
         weird_disk_database: Database[str, WeirdTestRecord],
-        weird_rec: TestRecord,
+        weird_rec: MyTestRecord,
 ):
     disk_database["foo"] = foo_rec
     weird_disk_database["foo"] = weird_rec
@@ -239,7 +239,7 @@ def test_disk_database(
     disk_database.put("foo", foo_rec)
 
     _path = disk_database._Database__base.inventory._path
-    copy = Database("test_database", record_type=TestRecord, base_mode="DISK", base_folder=_path.parent)
+    copy = Database("test_database", record_type=MyTestRecord, base_mode="DISK", base_folder=_path.parent)
     copy.remember_function(foo_rec.func)
     assert copy["foo"].number == 2
     del copy

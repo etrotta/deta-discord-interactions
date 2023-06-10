@@ -153,7 +153,7 @@ class Button(CustomIdComponent):
             if self.custom_id is None:
                 raise ValueError("Buttons must have a custom_id")
 
-        if isinstance(self.custom_id, list) or isinstance(self.custom_id, tuple):
+        if isinstance(self.custom_id, (list, tuple)):
             self.custom_id = "\n".join(str(item) for item in self.custom_id)
 
         if self.custom_id and len(self.custom_id) > 100:

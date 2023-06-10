@@ -34,27 +34,27 @@ class Database(MutableMapping[str, Record]):
         name : str
             Which name to use for the Deta Base
         record_type : Type[LoadableDataclass]
-            User defined record model (must inherit LoadableDataclass)
-        base_mode: Optional[str], support values: "DETA_BASE", "MEMORY", "DISK"
+            Record model (must inherit LoadableDataclass)
+        base_mode: Optional[str], support values: "DETA", "MEMORY", "DISK"
             Which mode to use for the database.
-            DETA_BASE: Uses Deta Base
+            DETA: Uses Deta Base
             DISK: Saves the data to a local file instead of using Deta Base.
             MEMORY: Keep the data in memory but do not save at all.
-            By default, uses the `DETA_ORM_DATABASE_MODE` environment variable, or "DETA_BASE" if unset
+            By default, uses the `DETA_ORM_DATABASE_MODE` environment variable, or "DETA" if unset
         base_folder : str
             If using `base_mode = "DISK"`, you can use this to specify where the database should be stored.
             If missing, expects for the `DETA_ORM_FOLDER` environment variable to be set.
         """
         if base_mode is None:
-            base_mode = os.getenv("DETA_ORM_DATABASE_MODE", "DETA_BASE")
-        if base_mode == "DETA_BASE":
+            base_mode = os.getenv("DETA_ORM_DATABASE_MODE", "DETA")
+        if base_mode.startswith("DETA"):
             self.__base = Base(name)
         elif base_mode == "MEMORY":
             self.__base = LocalBase(name, sync_disk=False)
         elif base_mode == "DISK":
             self.__base = LocalBase(name, sync_disk=True, folder=base_folder)
         else:
-            raise Exception("Invalid value for DETA_ORM_DATABASE_MODE environment variable")
+            raise Exception("Invalid value for DETA_ORM_DATABASE_MODE")
 
         self._record_type = record_type
         self.__known_functions = {}
