@@ -2,7 +2,7 @@ import os
 import itertools
 import json
 from typing import Callable, Optional, Type, Union, overload, TypeVar
-from collections.abc import MutableMapping
+from collections.abc import Generator, MutableMapping
 from datetime import datetime
 import inspect
 
@@ -293,7 +293,7 @@ class Database(MutableMapping[str, Record]):
                 data_chain = [data]
             if isinstance(key_source, str):
                 key_field = key_source
-                key_source = lambda record: str(getattr(record, key_field))
+                key_source = lambda record: str(getattr(record, key_field))  # noqa: E731
             self._put_many_list(data_chain, key_source, **kwargs)
         elif isinstance(data, dict):
             if iter:
@@ -342,7 +342,7 @@ class Database(MutableMapping[str, Record]):
             result.append(loaded)
         return result
 
-    def __iter__(self) -> list[Record]:
+    def __iter__(self) -> Generator[Record, None, None]:
         "I strongly recommend using fetch() instead"
         yield from self.fetch(
             query=None,

@@ -54,7 +54,9 @@ class DiscordInteractionsBlueprint:
         annotations: dict[str, str] = None,
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
-        dm_permission: bool = None,
+        # dm_permission: bool = None,
+        integration_types: list[int] = None,
+        contexts: list[int] = None,
         name_localizations: dict[str, str] = None,
         description_localizations: dict[str, str] = None,
     ):
@@ -94,7 +96,9 @@ class DiscordInteractionsBlueprint:
             annotations=annotations,
             type=type,
             default_member_permissions=default_member_permissions,
-            dm_permission=dm_permission,
+            # dm_permission=dm_permission,
+            integration_types=integration_types,
+            contexts=contexts,
             name_localizations=name_localizations,
             description_localizations=description_localizations,
             discord=self,
@@ -111,7 +115,9 @@ class DiscordInteractionsBlueprint:
         annotations: dict[str, str] = None,
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
-        dm_permission: bool = None,
+        # dm_permission: bool = None,
+        integration_types: list[int] = None,
+        contexts: list[int] = None,
         name_localizations: dict[str, str] = None,
         description_localizations: dict[str, str] = None,
     ) -> Callable[[Callable], Command]:
@@ -156,7 +162,9 @@ class DiscordInteractionsBlueprint:
                 annotations=annotations,
                 type=type,
                 default_member_permissions=default_member_permissions,
-                dm_permission=dm_permission,
+                # dm_permission=dm_permission,
+                integration_types=integration_types,
+                contexts=contexts,
                 name_localizations=name_localizations,
                 description_localizations=description_localizations,
             )
@@ -180,7 +188,9 @@ class DiscordInteractionsBlueprint:
         description: str = "No description",
         *,
         default_member_permissions: int = None,
-        dm_permission: bool = None,
+        # dm_permission: bool = None,
+        integration_types: list[int] = None,
+        contexts: list[int] = None,
         name_localizations: dict[str, str] = None,
         description_localizations: dict[str, str] = None,
     ):
@@ -213,7 +223,9 @@ class DiscordInteractionsBlueprint:
             name=name,
             description=description,
             default_member_permissions=default_member_permissions,
-            dm_permission=dm_permission,
+            # dm_permission=dm_permission,
+            integration_types=integration_types,
+            contexts=contexts,
             name_localizations=name_localizations,
             description_localizations=description_localizations,
         )
@@ -347,7 +359,7 @@ class DiscordInteractions(DiscordInteractionsBlueprint):
             I would strongly advise against it though - at least, do not run this *every time* but from a specific command or route
         """
         # It *would* work, it's just a big waste and may slow down the bot overall
-        if (os.getenv("DETA_SPACE_APP") is not None) and (from_inside_a_micro == False):
+        if (os.getenv("DETA_SPACE_APP") is not None) and (not from_inside_a_micro):
             raise Exception("Cannot register commands from inside a Deta Micro")
 
         if guild_id:

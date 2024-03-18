@@ -73,14 +73,14 @@ def weird_rec(mini_rec):
         3,
         [mini_rec] * 3,
         {1, "a", "b"},
-        {1: mini_rec, "a": mini_rec, "b": mini_rec},
+        {"1": mini_rec, "a": mini_rec, "b": mini_rec},
     )
     return rec
 
 DATE = datetime.datetime.fromisoformat("2020-01-01")
 
 def test_encode_decode(
-        database: Database[str, MyTestRecord],
+        database: Database[MyTestRecord],
         mini_rec: Mini,
         foo_func: typing.Callable,
         foo_rec: MyTestRecord,
@@ -132,7 +132,7 @@ def test_encode_decode(
     assert database.decode_entry(database.encode_entry(foo_rec.to_dict())) == foo_rec.to_dict()
     assert database.decode_entry(database.encode_entry(weird_rec.to_dict())) == weird_rec.to_dict()
 
-def test_record_loading(database: Database[str, MyTestRecord], foo_rec: MyTestRecord, mini_rec: Mini, weird_rec: WeirdTestRecord):
+def test_record_loading(database: Database[MyTestRecord], foo_rec: MyTestRecord, mini_rec: Mini, weird_rec: WeirdTestRecord):
     # Part 4) record loading
     assert mini_rec.from_dict(mini_rec.to_dict()) == mini_rec
     assert foo_rec.from_dict(foo_rec.to_dict()) == foo_rec
@@ -152,7 +152,7 @@ def test_record_loading(database: Database[str, MyTestRecord], foo_rec: MyTestRe
     assert foo_rec.from_dict(database.decode_entry(database.encode_entry(foo_rec.to_dict()))).nested == foo_rec.nested
     assert foo_rec.from_dict(database.decode_entry(database.encode_entry(foo_rec.to_dict()))).func() == foo_rec.func()
 
-def test_record_storing(database: Database[str, MyTestRecord], foo_rec: MyTestRecord):
+def test_record_storing(database: Database[MyTestRecord], foo_rec: MyTestRecord):
     # Part 6) storing and retrieving
     # not gonna lie, may have skipped a few steps, but whatever
     # Currently this uses an in-memory proxy-ish database
@@ -186,7 +186,7 @@ def test_record_storing(database: Database[str, MyTestRecord], foo_rec: MyTestRe
     database.put_many({"foo": foo_rec})
     assert database.get("foo") == foo_rec
 
-def test_queries(database: Database[str, MyTestRecord], foo_rec: MyTestRecord):
+def test_queries(database: Database[MyTestRecord], foo_rec: MyTestRecord):
     # Currently this uses an in-memory proxy-ish database
     # in the future it may be better to use monkeypatching 
     # and make sure that the requests it makes to the API look right
@@ -217,9 +217,9 @@ def test_queries(database: Database[str, MyTestRecord], foo_rec: MyTestRecord):
 
 
 def test_disk_database(
-        disk_database: Database[str, MyTestRecord],
+        disk_database: Database[MyTestRecord],
         foo_rec: MyTestRecord,
-        weird_disk_database: Database[str, WeirdTestRecord],
+        weird_disk_database: Database[WeirdTestRecord],
         weird_rec: MyTestRecord,
 ):
     disk_database["foo"] = foo_rec

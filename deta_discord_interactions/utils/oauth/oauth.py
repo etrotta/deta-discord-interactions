@@ -24,22 +24,27 @@ class PendingRecord(LoadableDataclass):
     redirect_uri: str
     pending_oauth: PendingOAuth
 
+class Callback(Protocol):
+    "Just to make it easier to identifity the signature the callback must have"
+    def __call__(self, token: Optional[OAuthToken], ctx: Context, *args, **kwargs) -> str: ...
 
 pending_oauths = Database(name="_discord_interactions_pending_oauths", record_type=PendingRecord)
-remember_callback = pending_oauths.remember_function
+def remember_callback(function: Callback):
+    """Use as a decorator on the function you want to use as a callback.
+    The function parameters must be: (token: Optional[OAuthToken], ctx: Context, *args, **kwargs)
+    """
+    return pending_oauths.remember_function(function)
 
 def enable_oauth(app: DiscordInteractions, /, *, path: str = "/oauth") -> None:
     """Allows for the app to receive and process OAuth and create Webhooks    
 
     Usage:
-    `app = enable_oauth(app)`
+    >>> app = DiscordInteraction()
+    >>> enable_oauth(app)
     """
     app.route(path)(_handle_oauth)
 
 
-class Callback(Protocol):
-    "Just to make it easier to identifity the signature the callback must have"
-    def __call__(self, token: Optional[OAuthToken], ctx: Context, *args, **kwargs) -> str: ...
 
 
 def request_oauth(

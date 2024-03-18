@@ -80,7 +80,9 @@ class Command:
         annotations: dict[str, str],
         type: int = ApplicationCommandType.CHAT_INPUT,
         default_member_permissions: int = None,
-        dm_permission: bool = None,
+        # dm_permission: bool = None,  # Deprecated in the Discord API
+        integration_types: list[int] = None,
+        contexts: list[int] = None,
         name_localizations: dict[str, str] = None,
         description_localizations: dict[str, str] = None,
         discord: "DiscordInteractions" = None,
@@ -93,7 +95,9 @@ class Command:
         self.annotations = annotations or {}
         self.type = type
         self.default_member_permissions = default_member_permissions
-        self.dm_permission = dm_permission
+        # self.dm_permission = dm_permission
+        self.integration_types = integration_types
+        self.contexts = contexts
         self.name_localizations = name_localizations
         self.description_localizations = description_localizations
         self.discord = discord
@@ -313,8 +317,10 @@ class Command:
         if self.default_member_permissions is not None:
             data["default_member_permissions"] = str(self.default_member_permissions)
 
-        if self.dm_permission is not None:
-            data["dm_permission"] = self.dm_permission
+        if self.integration_types is not None:
+            data["integration_types"] = self.integration_types
+        if self.contexts is not None:
+            data["contexts"] = self.contexts
 
         return data
 
@@ -502,7 +508,9 @@ class SlashCommandGroup(SlashCommandSubgroup):
         description,
         *,
         default_member_permissions=None,
-        dm_permission=None,
+        # dm_permission=None,
+        integration_types=None,
+        contexts=None,
         name_localizations=None,
         description_localizations=None,
     ):
@@ -512,7 +520,8 @@ class SlashCommandGroup(SlashCommandSubgroup):
         self.type = ApplicationCommandType.CHAT_INPUT
 
         self.default_member_permissions = default_member_permissions
-        self.dm_permission = dm_permission
+        self.integration_types = integration_types
+        self.contexts = contexts
         self.name_localizations = name_localizations
         self.description_localizations = description_localizations
 
