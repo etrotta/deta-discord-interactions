@@ -1,3 +1,8 @@
+> [!WARNING]
+> DO NOT USE THIS FORK
+> 
+> As of September 2024, Deta is being [sunset](https://web.archive.org/web/20240902151210/https://deta.space/sunset)
+
 # Deta-Discord-Interactions
 
 This is a small web framework that lets you write Discord Application Commands using a decorator syntax similar to Flask's `@app.route()` or Discord.py's `@bot.command()`, specialized for usage in https://deta.space
